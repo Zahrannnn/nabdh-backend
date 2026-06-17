@@ -1,0 +1,63 @@
+export enum UserType {
+  PATIENT = 'PATIENT',
+  NURSE = 'NURSE',
+  ADMIN = 'ADMIN',
+}
+
+export enum Gender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+}
+
+export enum NurseStatus {
+  PENDING_VERIFICATION = 'PENDING_VERIFICATION',
+  VERIFIED = 'VERIFIED',
+  SUSPENDED = 'SUSPENDED',
+  OFFLINE = 'OFFLINE',
+  ONLINE = 'ONLINE',
+  ON_DUTY = 'ON_DUTY',
+}
+
+export enum BookingStatus {
+  PENDING_OFFERS = 'PENDING_OFFERS',
+  NURSE_CONFIRMED = 'NURSE_CONFIRMED',
+  NURSE_EN_ROUTE = 'NURSE_EN_ROUTE',
+  NURSE_ARRIVED = 'NURSE_ARRIVED',
+  VISIT_IN_PROGRESS = 'VISIT_IN_PROGRESS',
+  VISIT_COMPLETED = 'VISIT_COMPLETED',
+  CANCELLED = 'CANCELLED',
+  DISPUTED = 'DISPUTED',
+}
+
+export enum RequestType {
+  STANDARD = 'STANDARD',
+  SOS = 'SOS',
+  SCHEDULED = 'SCHEDULED',
+}
+
+export enum PaymentMethod {
+  CASH = 'CASH',
+  CARD = 'CARD',
+  FAWRY = 'FAWRY',
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
+}
+
+export enum TransactionType {
+  COMMISSION = 'COMMISSION',
+  WITHDRAWAL = 'WITHDRAWAL',
+  PAYMENT = 'PAYMENT',
+  REFUND = 'REFUND',
+  BONUS = 'BONUS',
+}
+
+export enum OutboxStatus {
+  PENDING = 'PENDING',
+  PROCESSED = 'PROCESSED',
+  FAILED = 'FAILED',
+}

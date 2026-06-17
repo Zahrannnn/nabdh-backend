@@ -1,0 +1,9 @@
+# Global owners
+* @nabdh/backend-team
+
+# CI/CD
+.github/workflows/* @nabdh/backend-team
+
+# Documentation
+docs/* @nabdh/backend-team
+README.md @nabdh/backend-team
