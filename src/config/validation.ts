@@ -5,10 +5,9 @@ export const validationSchema = Joi.object({
   LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('debug'),
   PORT: Joi.number().default(3000),
 
-  DATABASE_URL: Joi.string().required(),
-  POSTGRES_USER: Joi.string().required(),
-  POSTGRES_PASSWORD: Joi.string().required(),
-  POSTGRES_DB: Joi.string().required(),
+  MONGODB_URI: Joi.string().default(
+    'mongodb://nabdh:nabdh_dev@localhost:27017/nabdh?authSource=admin',
+  ),
 
   JWT_SECRET: Joi.string().required(),
   JWT_ACCESS_EXPIRY: Joi.string().default('15m'),

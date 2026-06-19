@@ -4,7 +4,7 @@
 
 - **Node.js** 20 LTS (via `.nvmrc`)
 - **pnpm** 9 (`npm install -g pnpm@9`)
-- **Docker Desktop** (for PostgreSQL + MinIO)
+- **Docker Desktop** (for MongoDB + MinIO)
 - **Git**
 
 ## Quick Start
@@ -21,13 +21,9 @@ cp .env.example .env
 pnpm install
 
 # 4. Start infrastructure
-docker compose -f infra/docker/docker-compose.yml up -d postgres minio
+docker compose -f infra/docker/docker-compose.yml up -d mongo minio
 
-# 5. Database migrations
-pnpm prisma migrate dev --name init
-pnpm prisma generate
-
-# 6. Start API (hot-reload)
+# 5. Start API (hot-reload)
 pnpm start:dev
 ```
 
@@ -42,10 +38,8 @@ cp .env.example .env && pnpm install && pnpm prisma migrate dev && docker compos
 ## Docker-Only Mode
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml up --build
+cp .env.example .env && pnpm install && docker compose -f infra/docker/docker-compose.yml up --build
 ```
-
-The Docker image runs `prisma migrate deploy` on startup.
 
 ## Verify
 
@@ -80,6 +74,4 @@ pnpm prisma:migrate --name migration_name
 
 **Port conflict on 3000**: Kill existing process or set `PORT=3001` in `.env`
 
-**PostGIS extension not found**: Ensure `postgis/postgis:16-3.4` image is used
-
-**Prisma client not found**: Run `pnpm prisma generate`
+**MongoDB connection refused**: Ensure Docker container is running and `.env` has correct `MONGODB_URI`

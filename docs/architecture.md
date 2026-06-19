@@ -37,7 +37,7 @@ graph TB
         Booking --> OB
     end
     subgraph "Infrastructure"
-        PG[(PostgreSQL<br/>PostGIS)]
+        DB[(MongoDB 7<br/>2dsphere Geo)]
         MN[(MinIO S3<br/>Documents)]
     end
     
@@ -52,8 +52,8 @@ graph TB
 ## Key Decisions
 
 - **Single process** — all REST + WebSocket on port 3000
-- **No Redis** — event-emitter + outbox table for async
-- **PostGIS** — location proximity queries
+- **No Redis** — event-emitter + outbox collection for async
+- **MongoDB 2dsphere** — location proximity queries
 - **MinIO** — S3-compatible document storage
 
 ## Module Communication
@@ -62,4 +62,4 @@ graph TB
 |---------|-----------|----------|
 | Synchronous | Injected service | Cross-module queries (e.g., booking reads user) |
 | In-process event | `@nestjs/event-emitter` | Immediate reactions (e.g., notification on offer) |
-| Async event | Outbox table + cron | Reliable dispatch (e.g., analytics aggregation) |
+| Async event | Outbox collection + cron | Reliable dispatch (e.g., analytics aggregation) |

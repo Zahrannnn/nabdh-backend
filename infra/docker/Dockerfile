@@ -10,9 +10,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY tsconfig.json nest-cli.json ./
 COPY src ./src
-COPY prisma ./prisma
 
-RUN pnpm prisma generate
 RUN pnpm build
 
 # ── Production stage ──
@@ -26,10 +24,7 @@ RUN addgroup --system --gid 1001 nabdh && \
     adduser --system --uid 1001 --ingroup nabdh nabdh
 
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile --prod
-
-COPY prisma ./prisma
-RUN pnpm prisma generate
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 COPY --from=builder /app/dist ./dist
 

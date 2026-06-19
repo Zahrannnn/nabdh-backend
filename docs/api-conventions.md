@@ -10,7 +10,7 @@ http://localhost:3000/api/v1
 
 - Patients & Nurses: OTP → JWT (access 15min + refresh 7d)
 - Admin: email + password + 2FA (TOTP stub)
-- JWT payload: `{ sub, type: PATIENT | NURSE | ADMIN, role, iat, exp }`
+- JWT payload: `{ sub, type, role, nurse_status?, iat, exp }`
 - Send as `Authorization: Bearer <token>`
 
 ## Standard Response Format

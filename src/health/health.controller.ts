@@ -1,6 +1,6 @@
 import { Controller, Get, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { PrismaService } from '../database/prisma.service';
+import { DatabaseService } from '../database/database.service';
 import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('Health')
@@ -8,7 +8,7 @@ import { Public } from '../common/decorators/public.decorator';
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   @Public()
   @Get()
@@ -21,20 +21,19 @@ export class HealthController {
   @Get('ready')
   @ApiOperation({ summary: 'Readiness check (includes database)' })
   async readiness() {
-    try {
-      await this.prisma.$queryRaw`SELECT 1`;
+    const dbConnected = await this.databaseService.ping();
+    if (dbConnected) {
       return {
         status: 'ok',
         database: 'connected',
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
-      this.logger.error('Readiness check failed', error);
-      return {
-        status: 'error',
-        database: 'disconnected',
-        timestamp: new Date().toISOString(),
-      };
     }
+    this.logger.error('Readiness check failed — MongoDB unreachable');
+    return {
+      status: 'error',
+      database: 'disconnected',
+      timestamp: new Date().toISOString(),
+    };
   }
 }

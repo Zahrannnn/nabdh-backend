@@ -1,14 +1,25 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongooseModule } from '@nestjs/mongoose';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
 describe('Nabdh API (e2e)', () => {
   let app: INestApplication;
+  let mongoServer: MongoMemoryServer;
 
   beforeAll(async () => {
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [
+        MongooseModule.forRootAsync({
+          useFactory: async () => ({ uri: mongoUri }),
+        }),
+        AppModule,
+      ],
     }).compile();
 
     app = moduleFixture.createNestApplication();
@@ -26,6 +37,7 @@ describe('Nabdh API (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+    await mongoServer.stop();
   });
 
   describe('Health', () => {

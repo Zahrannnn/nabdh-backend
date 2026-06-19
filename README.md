@@ -5,7 +5,7 @@
 ![NestJS](https://img.shields.io/badge/NestJS-10.x-E0234E)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)
 ![Node](https://img.shields.io/badge/Node-20-339933)
-![PostGIS](https://img.shields.io/badge/PostGIS-16-336791)
+![MongoDB](https://img.shields.io/badge/MongoDB-7-47A248)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ---
@@ -17,7 +17,7 @@ graph TB
     P[Flutter Patient App] --> API[Nabdh API :3000]
     N[Flutter Nurse App] --> API
     A[React Admin Panel] --> API
-    API --> PG[(PostgreSQL + PostGIS)]
+    API --> DB[(MongoDB 7 + 2dsphere)]
     API --> MN[(MinIO S3)]
     
     subgraph "Modular Monolith"
@@ -35,7 +35,7 @@ graph TB
     style API fill:#4a90d9,color:#fff
 ```
 
-**Architecture Decision:** [Modular Monolith](./docs/adr/001-modular-monolith.md) — one deployable NestJS app, domain modules inside. No microservices, no Redis.
+**Architecture Decision:** [Modular Monolith](./docs/adr/001-modular-monolith.md) — one deployable NestJS app, domain modules inside. No microservices, no Redis, no PostgreSQL.
 
 ---
 
@@ -62,14 +62,10 @@ cp .env.example .env
 # 3. Install dependencies
 pnpm install
 
-# 4. Start infrastructure (PostgreSQL + MinIO)
-docker compose -f infra/docker/docker-compose.yml up -d postgres minio
+# 4. Start infrastructure (MongoDB 7 + MinIO)
+docker compose -f infra/docker/docker-compose.yml up -d mongo minio
 
-# 5. Run database migrations
-pnpm prisma migrate dev --name init
-pnpm prisma generate
-
-# 6. Start development server
+# 5. Start development server
 pnpm start:dev
 ```
 
@@ -106,7 +102,7 @@ See [.env.example](.env.example) for all variables.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PORT` | API server port | `3000` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://nabdh:nabdh_dev@postgres:5432/nabdh` |
+| `MONGODB_URI` | MongoDB connection string | `mongodb://nabdh:nabdh_dev@localhost:27017/nabdh` |
 | `JWT_SECRET` | JWT signing secret | `change-me-in-production` |
 | `S3_ENDPOINT` | MinIO/S3 endpoint | `http://minio:9000` |
 
@@ -119,7 +115,6 @@ pnpm start:dev    # Hot-reload dev server
 pnpm lint         # ESLint + Prettier
 pnpm test         # Unit tests
 pnpm test:e2e     # E2E tests
-pnpm prisma:studio  # Database GUI
 ```
 
 ### Branch Workflow

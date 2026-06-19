@@ -30,8 +30,8 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Prisma
-prisma/migrations/
+# MongoDB data
+data/
 
 # Docker
 docker-compose.override.yml
