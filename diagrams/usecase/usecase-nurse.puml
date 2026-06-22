@@ -1,0 +1,144 @@
+@startuml
+
+skinparam backgroundColor #FCFCFC
+skinparam actorBorderColor #2E86AB
+skinparam actorFontColor #2E86AB
+skinparam actorFontSize 14
+skinparam usecaseBorderColor #2E86AB
+skinparam usecaseFontColor #1A5676
+skinparam usecaseFontSize 12
+skinparam usecaseBackgroundColor #EAFAF1
+skinparam arrowColor #555555
+skinparam packageBackgroundColor #F0F5FA
+skinparam packageBorderColor #2E86AB
+skinparam packageFontStyle bold
+skinparam packageFontSize 13
+skinparam titleFontSize 16
+skinparam titleFontColor #2E86AB
+skinparam noteBackgroundColor #EAFAF1
+skinparam noteBorderColor #27AE60
+
+left to right direction
+
+title **Nabdh Platform** — Nursing Professional (Nurse) Use Case Diagram
+
+actor "Nursing Professional\n(ممرض / ممرضة)" as Nurse
+
+rectangle "**Account & Verification**" {
+  usecase "Register via OTP" as N1
+  usecase "Upload Verification\nDocuments" as N2
+  usecase "View Verification\nStatus" as N3
+  usecase "Manage Profile\n(Gender, Bio, Specializations)" as N4
+}
+
+rectangle "**Availability & Requests**" {
+  usecase "Toggle Online\n/ Offline" as N5
+  usecase "Receive Nearby\nRequest Notifications" as N6
+  usecase "View Request\nDetails" as N7
+  usecase "Reject Incoming\nRequest" as N8
+}
+
+rectangle "**Offers & Booking**" {
+  usecase "Submit Price\nOffer" as N9
+  usecase "Withdraw\nOffer" as N10
+  usecase "Confirm Assignment\n(Accept Booking)" as N11
+  usecase "Reject Assignment" as N12
+  usecase "Cancel Accepted\nBooking (with Reason)" as N13
+}
+
+rectangle "**SOS Emergency**" {
+  usecase "Receive SOS\nAlert (Urgent)" as N14
+  usecase "Accept SOS\nRequest (One-Tap)" as N15
+}
+
+rectangle "**Visit & Communication**" {
+  usecase "Navigate to\nPatient Location" as N16
+  usecase "Mark En Route" as N17
+  usecase "Mark Arrived" as N18
+  usecase "Mark Visit\nStarted" as N19
+  usecase "Mark Visit\nCompleted" as N20
+  usecase "Chat with\nPatient (Text)" as N21
+}
+
+rectangle "**Wallet & Ratings**" {
+  usecase "View Wallet\nDashboard" as N22
+  usecase "View Transaction\nHistory" as N23
+  usecase "Request\nWithdrawal" as N24
+  usecase "View Earnings\nAnalytics" as N25
+  usecase "Rate Patient\n(1-5 Stars)" as N26
+  usecase "View Own\nRatings & Reviews" as N27
+  usecase "Verify OTP" as N1_OTP
+  usecase "Upload\nNational ID" as N2A
+  usecase "Upload\nNursing License" as N2B
+  usecase "Upload\nProfile Photo" as N2C
+}
+
+' ── NURSE ASSOCIATIONS ──────────────────────────────────────
+Nurse --> N1
+Nurse --> N2
+Nurse --> N3
+Nurse --> N4
+Nurse --> N5
+Nurse --> N6
+Nurse --> N7
+Nurse --> N8
+Nurse --> N9
+Nurse --> N10
+Nurse --> N11
+Nurse --> N12
+Nurse --> N13
+Nurse --> N14
+Nurse --> N15
+Nurse --> N16
+Nurse --> N17
+Nurse --> N18
+Nurse --> N19
+Nurse --> N20
+Nurse --> N21
+Nurse --> N22
+Nurse --> N23
+Nurse --> N24
+Nurse --> N25
+Nurse --> N26
+Nurse --> N27
+
+' ── INCLUDE / EXTEND ────────────────────────────────────────
+N1 ..> N1_OTP : <<include>>
+N2 ..> N2A : <<include>>
+N2 ..> N2B : <<include>>
+N2 ..> N2C : <<include>>
+N15 ..> N14 : <<include>>
+
+' ── NOTES ───────────────────────────────────────────────────
+note right of N3
+  License expiry tracking:
+  - Warning 30 days before
+  - Warning 7 days before
+  - Auto-offline on expiry
+end note
+
+note right of N5
+  Requires:
+  - VERIFIED status
+  - ≥ EGP 100 prepaid balance
+  - License not expired
+  - No active booking
+end note
+
+note right of N13
+  Must select reason:
+  1. Personal emergency
+  2. Location too far
+  3. Outside specialization
+  4. Transportation issue
+  5. Other (free text)
+end note
+
+note right of N24
+  Minimum: EGP 100
+  Methods: Vodafone Cash,
+  Etisalat Cash, InstaPay
+  Processing: 1-3 business days
+end note
+
+@enduml

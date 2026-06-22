@@ -20,6 +20,6 @@ import { NurseDocument, NurseDocumentSchema } from './schemas/nurse-document.sch
   ],
   controllers: [UsersController],
   providers: [UsersService],
-  exports: [UsersService],
+  exports: [UsersService, MongooseModule],
 })
 export class UsersModule {}

@@ -1,6 +1,6 @@
 # Nabdh Platform — Backend Agent Context File
 
-> **Version:** 1.3  
+> **Version:** 1.4  
 > **Last Updated:** June 17, 2026  
 > **Audience:** Backend AI agent, backend developer, tech lead  
 > **Purpose:** Single source of truth for planning, scaffolding, and implementing the Nabdh backend.  
@@ -12,7 +12,7 @@
 
 1. **Attach or paste this entire file** at the start of every backend agent session.
 2. Treat decisions in **Section 4 (v1.2 Decision Log)** as authoritative over older draft text.
-3. When implementing a feature, cross-reference: **Module ownership → API → ERD → Events → Sequence diagram**.
+3. When implementing a feature, cross-reference: **Module ownership → API → Collections/Schemas → Events → Sequence diagram**.
 4. Do **not** invent business rules not listed here. If ambiguous, flag and ask.
 5. All monetary values are **EGP**. All users are **Egypt-only**.
 
@@ -65,7 +65,7 @@
 
 | Role             | Count | Repo                                                                             |
 | ---------------- | ----- | -------------------------------------------------------------------------------- |
-| Backend          | 1     | `nabdh-backend` — **modular monolith** (single NestJS app)                         |
+| Backend          | 1     | `nabdh-backend` — **modular monolith** (single NestJS app)                       |
 | Flutter          | 1     | `nabdh-mobile` (TBD — single codebase, role switching or separate apps TBD)      |
 | Frontend (Admin) | 1     | `nabdh-admin` (TBD — React/Next.js)                                              |
 | UI/UX            | 1     | Figma → feeds mobile + admin                                                     |
@@ -152,6 +152,7 @@ These override any conflicting text elsewhere:
 | **C18** | In-app support       | **No dedicated support channel in MVP.** Disputes via booking dispute flow.                                                      |
 | **C19** | Nurse cancel rate    | Rate > **15%** → admin alert only in MVP (no auto-suspension).                                                                   |
 | **C20** | Architecture         | **Modular Monolith** — single NestJS deployable, domain modules inside one app. No microservices in MVP.                         |
+| **C21** | Database             | **MongoDB 7+** with **2dsphere** geospatial indexes. **Mongoose** ODM. No PostgreSQL/PostGIS/Prisma.                             |
 
 
 ---
@@ -176,54 +177,57 @@ One **NestJS application** on port **3000**. Domain logic split into **modules**
                            │
               ┌────────────┴────────────┐
               ▼                         ▼
-         PostgreSQL                  MinIO/S3
-        (+ PostGIS)              (documents)
+         MongoDB 7                   MinIO/S3
+        (2dsphere geo)            (documents)
 ```
 
 ### Domain Modules
 
 
-| Module            | Route prefix (examples)                 | Owns                                                                                  |
-| ----------------- | --------------------------------------- | ------------------------------------------------------------------------------------- |
-| **auth**          | `/api/v1/auth/*`                        | OTP, JWT, sessions, guards                                                            |
-| **users**         | `/api/v1/patient/*`, `/api/v1/nurse/*`  | Patients, nurses, addresses, documents, verification, license cron                    |
-| **booking**       | `/api/v1/requests/*`, `/api/v1/bookings/*` | Requests, offers, bookings, SOS, scheduled, ratings, disputes, state machine       |
-| **payment**       | `/api/v1/payments/*`, wallet routes     | Paymob, Fawry, wallet, ledger, commission, withdrawals                                |
-| **location**      | tracking endpoints                      | Nurse GPS, PostGIS, ETA, location history                                             |
-| **chat**          | WebSocket `/api/v1/realtime`            | Messages, Socket.io rooms                                                             |
-| **notifications** | `/api/v1/notifications/*`               | FCM, SMS, in-app notifications                                                        |
-| **admin**         | `/api/v1/admin/*`                       | Dashboard, disputes, audit logs, commission config, SOS monitor                       |
-| **analytics**     | internal                                | Metrics, reports (stub)                                                               |
+| Module            | Route prefix (examples)                    | Owns                                                                         |
+| ----------------- | ------------------------------------------ | ---------------------------------------------------------------------------- |
+| **auth**          | `/api/v1/auth/*`                           | OTP, JWT, sessions, guards                                                   |
+| **users**         | `/api/v1/patient/*`, `/api/v1/nurse/*`     | Patients, nurses, addresses, documents, verification, license cron           |
+| **booking**       | `/api/v1/requests/*`, `/api/v1/bookings/*` | Requests, offers, bookings, SOS, scheduled, ratings, disputes, state machine |
+| **payment**       | `/api/v1/payments/*`, wallet routes        | Paymob, Fawry, wallet, ledger, commission, withdrawals                       |
+| **location**      | tracking endpoints                         | Nurse GPS, MongoDB `$geoNear`, ETA, location history                         |
+| **chat**          | WebSocket `/api/v1/realtime`               | Messages, Socket.io rooms                                                    |
+| **notifications** | `/api/v1/notifications/*`                  | FCM, SMS, in-app notifications                                               |
+| **admin**         | `/api/v1/admin/*`                          | Dashboard, disputes, audit logs, commission config, SOS monitor              |
+| **analytics**     | internal                                   | Metrics, reports (stub)                                                      |
 
 
 ### Module Boundary Rules
 
 1. Cross-module calls via **exported NestJS providers only** — never import internal files
 2. Controllers are thin; logic in `*.service.ts`
-3. **Single Prisma schema** — tables tagged `// module: booking`
+3. **Mongoose schemas** per module in `src/modules/<name>/schemas/`
 4. **No HTTP between modules** — inject services directly (same process)
 5. Modules can be extracted to microservices later by swapping DI for HTTP
 
 ### Communication Patterns
 
 
-| Type        | Technology                     | Use Case                                   |
-| ----------- | ------------------------------ | ------------------------------------------ |
-| Sync        | NestJS DI (service injection)  | `BookingService` injects `UsersService`    |
-| In-process  | `@nestjs/event-emitter`        | Side effects: notify, log, analytics       |
-| Async       | PostgreSQL `OutboxEvent` + cron | Reliable background delivery              |
-| Real-time   | Socket.io (chat module)        | Offers, tracking, chat                       |
-| Scheduled   | `@nestjs/schedule`             | License expiry, scheduled bookings, outbox |
+| Type        | Technology                            | Use Case                                   |
+| ----------- | ------------------------------------- | ------------------------------------------ |
+| Sync        | NestJS DI (service injection)         | `BookingService` injects `UsersService`    |
+| In-process  | `@nestjs/event-emitter`               | Side effects: notify, log, analytics       |
+| Async       | MongoDB `outbox_events` collection + cron | Reliable background delivery            |
+| Real-time   | Socket.io (chat module)               | Offers, tracking, chat                     |
+| Scheduled   | `@nestjs/schedule`                    | License expiry, scheduled bookings, outbox   |
+| Financial   | MongoDB multi-document transactions   | Wallet credits, commission, ledger         |
 
 
-> **No Redis. No microservices.** OTP, sessions, rate limits in PostgreSQL.
+> **No Redis. No microservices. No PostgreSQL.** OTP, sessions, rate limits in MongoDB.
 
 ### Database Strategy
 
-- **Single PostgreSQL 16** database `nabdh` with **PostGIS**
-- **Single `prisma/schema.prisma`** — all models, grouped by module comments
-- Foreign keys allowed (same database)
-- `OutboxEvent` model for async domain events
+- **Single MongoDB 7** database: `nabdh`
+- **Collections** per domain (see Section 7)
+- **Geospatial:** GeoJSON `Point` + **2dsphere** indexes
+- **ODM:** Mongoose via `@nestjs/mongoose`
+- `outbox_events` collection for async domain events
+- **Wallet/ledger:** MongoDB multi-document transactions (ACID)
 
 ---
 
@@ -236,18 +240,18 @@ One **NestJS application** on port **3000**. Domain logic split into **modules**
 | Runtime      | Node.js 20 LTS                                       |
 | Language     | TypeScript 5.x (strict)                              |
 | Framework    | NestJS 10+                                           |
-| ORM          | Prisma — single schema                               |
+| ODM          | Mongoose via `@nestjs/mongoose`                      |
 | Validation   | class-validator + class-transformer                  |
 | API Docs     | @nestjs/swagger at `/api/docs`                       |
 | Testing      | Jest + Supertest                                     |
 | Linting      | ESLint + Prettier + Husky + lint-staged + commitlint |
 | Logging      | Winston (structured JSON)                            |
 | Real-time    | Socket.io via `@nestjs/websockets` (chat module)     |
-| Events       | EventEmitter + PostgreSQL outbox (`src/events/`)     |
+| Events       | EventEmitter + MongoDB outbox (`src/events/`)        |
 | Scheduled    | `@nestjs/schedule`                                   |
 | File storage | MinIO (dev) / AWS S3 (prod)                          |
 | CI/CD        | GitHub Actions + Docker (single `nabdh-api` image)   |
-| Cloud (prod) | ECS Fargate (1 service), RDS PostgreSQL, S3, ALB     |
+| Cloud (prod) | ECS Fargate (1 service), MongoDB Atlas, S3, ALB      |
 | Region       | `me-south-1` (Bahrain — closest to Egypt)            |
 
 
@@ -264,32 +268,57 @@ One **NestJS application** on port **3000**. Domain logic split into **modules**
 
 ---
 
-## 7. Domain Model & ERD
+## 7. Domain Model & MongoDB Collections
 
-### Core Entities
+### Collections Map
+
+| Collection | Module | Notes |
+|------------|--------|-------|
+| `users` | auth + users | Base user; `_id` as ObjectId |
+| `patients` | users | `userId` ref |
+| `nurses` | users | `userId` ref; `location` GeoJSON Point |
+| `addresses` | users | `location` GeoJSON Point |
+| `nurse_documents` | users | |
+| `services` | admin | Service catalog |
+| `service_requests` | booking | `location` GeoJSON Point |
+| `offers` | booking | |
+| `bookings` | booking | |
+| `payments` | payment | |
+| `wallets` | payment | |
+| `wallet_transactions` | payment | |
+| `chat_messages` | chat | TTL index optional (Phase 2) |
+| `notifications` | notifications | |
+| `location_history` | location | `location` GeoJSON Point; time-series friendly |
+| `audit_logs` | admin | |
+| `otp_sessions` | auth | TTL index on `expiresAt` |
+| `refresh_tokens` | auth | |
+| `outbox_events` | events | |
+| `ratings` | booking | |
+
+### Core Documents
 
 
 | Entity                | Owner Module | Key Fields                                                                                                                                                      |
-| --------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **User**              | auth + user   | `id`, `phone`, `password_hash` (admin only), `type`, `status`, `created_at`                                                                                     |
-| **Patient**           | user          | `user_id`, `full_name`, `gender`, `date_of_birth`, `photo_url`                                                                                                  |
-| **Nurse**             | user          | `user_id`, `full_name`, `gender`, `license_number`, `license_expiry_date`, `verification_status`, `avg_rating`, `is_online`, `current_lat`, `current_lng`       |
-| **NurseDocument**     | user          | `nurse_id`, `type` (ID/LICENSE/PHOTO), `file_url`, `status`                                                                                                     |
-| **Address**           | user          | `user_id`, `label`, `governorate`, `city`, `street`, `lat`, `lng`, `notes`                                                                                      |
-| **Service**           | admin         | `name_ar`, `description_ar`, `icon`, `base_price_min`, `base_price_max`, `duration_minutes`, `status`, `commission_rate`                                        |
-| **ServiceRequest**    | booking       | `patient_id`, `service_id` (nullable for SOS), `type`, `status`, `gender_preference`, `notes`, `sos_description`, `lat`, `lng`, `scheduled_for`, `broadcast_at` |
-| **Offer**             | booking       | `request_id`, `nurse_id`, `price`, `eta_minutes`, `status`, `relevance_score`                                                                                   |
-| **Booking**           | booking       | `request_id`, `patient_id`, `nurse_id`, `offer_id`, `status`, `en_route_at`, `arrived_at`, `visit_started_at`, `visit_completed_at`                             |
-| **Payment**           | payment       | `booking_id`, `amount`, `method`, `provider`, `status`, `provider_reference`                                                                                    |
-| **Wallet**            | payment       | `nurse_id`, `available_balance`, `prepaid_balance`, `pending_balance`, `total_earned`, `total_commission`                                                       |
-| **WalletTransaction** | payment       | `wallet_id`, `type`, `amount`, `reference_type`, `reference_id`, `description`                                                                                  |
-| **ChatMessage**       | chat          | `booking_id`, `sender_id`, `content`, `status`, `sent_at`, `delivered_at`                                                                                       |
-| **Rating**            | booking       | `booking_id`, `rater_id`, `ratee_id`, `score`, `review_text`, `editable_until`                                                                                  |
-| **Notification**      | notification  | `user_id`, `type`, `title`, `body`, `data`, `read_at`                                                                                                           |
-| **LocationHistory**   | location      | `nurse_id`, `booking_id`, `lat`, `lng`, `speed`, `recorded_at`                                                                                                  |
-| **AuditLog**          | admin         | `actor_id`, `action`, `resource_type`, `resource_id`, `details`, `ip`, `timestamp`                                                                              |
-| **OtpSession**        | auth          | `phone`, `code_hash`, `expires_at`, `attempts`                                                                                                                  |
-| **RefreshToken**      | auth          | `user_id`, `token_hash`, `expires_at`, `revoked_at`                                                                                                             |
+| --------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **User**              | auth + user  | `id`, `phone`, `password_hash` (admin only), `type`, `status`, `created_at`                                                                                     |
+| **Patient**           | user         | `user_id`, `full_name`, `gender`, `date_of_birth`, `photo_url`                                                                                                  |
+| **Nurse**             | users        | `userId`, `fullName`, `gender`, `licenseNumber`, `licenseExpiryDate`, `verificationStatus`, `avgRating`, `isOnline`, `location` (GeoJSON Point) |
+| **NurseDocument**     | users        | `nurseId`, `type`, `fileUrl`, `status`                                                                                                         |
+| **Address**           | users        | `userId`, `label`, `governorate`, `city`, `street`, `location` (GeoJSON Point), `notes`                                                          |
+| **Service**           | admin        | `name_ar`, `description_ar`, `icon`, `base_price_min`, `base_price_max`, `duration_minutes`, `status`, `commission_rate`                                        |
+| **ServiceRequest**    | booking      | `patientId`, `serviceId`, `type`, `status`, `genderPreference`, `notes`, `sosDescription`, `location` (GeoJSON), `scheduledFor`, `broadcastAt` |
+| **Offer**             | booking      | `request_id`, `nurse_id`, `price`, `eta_minutes`, `status`, `relevance_score`                                                                                   |
+| **Booking**           | booking      | `request_id`, `patient_id`, `nurse_id`, `offer_id`, `status`, `en_route_at`, `arrived_at`, `visit_started_at`, `visit_completed_at`                             |
+| **Payment**           | payment      | `booking_id`, `amount`, `method`, `provider`, `status`, `provider_reference`                                                                                    |
+| **Wallet**            | payment      | `nurse_id`, `available_balance`, `prepaid_balance`, `pending_balance`, `total_earned`, `total_commission`                                                       |
+| **WalletTransaction** | payment      | `wallet_id`, `type`, `amount`, `reference_type`, `reference_id`, `description`                                                                                  |
+| **ChatMessage**       | chat         | `booking_id`, `sender_id`, `content`, `status`, `sent_at`, `delivered_at`                                                                                       |
+| **Rating**            | booking      | `booking_id`, `rater_id`, `ratee_id`, `score`, `review_text`, `editable_until`                                                                                  |
+| **Notification**      | notification | `user_id`, `type`, `title`, `body`, `data`, `read_at`                                                                                                           |
+| **LocationHistory**   | location     | `nurse_id`, `booking_id`, `lat`, `lng`, `speed`, `recorded_at`                                                                                                  |
+| **AuditLog**          | admin        | `actor_id`, `action`, `resource_type`, `resource_id`, `details`, `ip`, `timestamp`                                                                              |
+| **OtpSession**        | auth         | `phone`, `code_hash`, `expires_at`, `attempts`                                                                                                                  |
+| **RefreshToken**      | auth         | `user_id`, `token_hash`, `expires_at`, `revoked_at`                                                                                                             |
 
 
 ### Key Enums
@@ -311,6 +340,36 @@ enum WalletTransactionType {
 }
 enum DocumentType { NATIONAL_ID = 'NATIONAL_ID', NURSING_LICENSE = 'NURSING_LICENSE', PROFILE_PHOTO = 'PROFILE_PHOTO' }
 ```
+
+### Geospatial (MongoDB 2dsphere)
+
+Store coordinates as **GeoJSON Point** — `[longitude, latitude]` order:
+
+```typescript
+// Nurse schema excerpt
+location: {
+  type: { type: String, enum: ['Point'], default: 'Point' },
+  coordinates: { type: [Number], required: true }, // [lng, lat]
+}
+// Index: nurseSchema.index({ location: '2dsphere' });
+```
+
+**Nearby nurses query** (15 km standard, meters in `$maxDistance`):
+
+```javascript
+db.nurses.find({
+  isOnline: true,
+  verificationStatus: 'APPROVED',
+  location: {
+    $near: {
+      $geometry: { type: 'Point', coordinates: [patientLng, patientLat] },
+      $maxDistance: 15000
+    }
+  }
+})
+```
+
+Use `$geoNear` aggregation when sorting by distance + filtering in one pipeline.
 
 ### Booking Status State Machine
 
@@ -397,7 +456,7 @@ Branches:
 1. Patient selects service, address, optional notes, optional gender preference
 2. Validate: no active booking for patient
 3. Create request → `PENDING_OFFERS`
-4. Location-service: find online verified nurses within **15 km** (expand to 30 if < 3 matches)
+4. Location-service finds online verified nurses within **15 km** via `$geoNear` / `$near` (expand to 30 if < 3 matches)
 5. Filter by gender preference if set
 6. Broadcast push to matching nurses
 7. Nurses submit offers (price + ETA)
@@ -679,34 +738,34 @@ Defined in `src/events/`. Each event has: `eventId`, `eventType`, `timestamp`, `
 **Delivery mechanisms:**
 
 1. **In-process** — `@nestjs/event-emitter` listeners in consumer modules
-2. **PostgreSQL outbox** — `OutboxEvent` Prisma model; `OutboxProcessor` cron polls and dispatches
+2. **MongoDB outbox** — `outbox_events` collection; `OutboxProcessor` cron polls and dispatches
 
 **No Redis. No inter-module HTTP.**
 
 
-| Event                       | Producer Module | Consumer Module(s)                | Trigger                         |
-| --------------------------- | -------- | --------------------------------- | ------------------------------- |
-| `request.created`           | booking  | location, notifications         | Standard request submitted      |
-| `request.sos.created`       | booking  | location, notifications, admin  | SOS triggered                   |
-| `request.scheduled.created` | booking  | analytics                         | Scheduled request saved         |
-| `request.broadcast`         | booking  | notifications                     | Scheduled broadcast triggered   |
-| `offer.submitted`           | booking  | notifications                     | Nurse submits offer             |
-| `offer.selected`            | booking  | notifications, payment            | Patient selects offer           |
-| `booking.status.changed`    | booking  | notifications, location, analytics | Any status transition        |
-| `booking.completed`         | booking  | payment, analytics                | Visit completed                 |
-| `booking.cancelled`         | booking  | notifications, analytics          | Cancel by either party          |
-| `payment.completed`         | payment  | booking, notifications, analytics | Payment confirmed               |
-| `payment.failed`            | payment  | notifications, admin              | Payment failure                 |
-| `wallet.credited`           | payment  | notifications                     | Nurse wallet credited           |
-| `wallet.prepaid.low`        | payment  | notifications, admin              | Prepaid balance below threshold |
-| `nurse.verified`            | users    | notifications                     | Admin approves nurse            |
-| `nurse.license.expiring`    | users    | notifications                     | 30d / 7d warning                |
-| `nurse.license.expired`     | users    | booking, notifications            | Auto-suspend                    |
-| `nurse.location.updated`    | location | booking                           | Active booking tracking         |
-| `chat.message.sent`         | chat     | notifications                     | New chat message                |
-| `rating.submitted`          | booking  | users, analytics                  | Rating saved                    |
-| `dispute.opened`            | booking  | admin, notifications              | Dispute filed                   |
-| `user.anonymized`           | users    | analytics                         | Account deleted                 |
+| Event                       | Producer Module | Consumer Module(s)                 | Trigger                         |
+| --------------------------- | --------------- | ---------------------------------- | ------------------------------- |
+| `request.created`           | booking         | location, notifications            | Standard request submitted      |
+| `request.sos.created`       | booking         | location, notifications, admin     | SOS triggered                   |
+| `request.scheduled.created` | booking         | analytics                          | Scheduled request saved         |
+| `request.broadcast`         | booking         | notifications                      | Scheduled broadcast triggered   |
+| `offer.submitted`           | booking         | notifications                      | Nurse submits offer             |
+| `offer.selected`            | booking         | notifications, payment             | Patient selects offer           |
+| `booking.status.changed`    | booking         | notifications, location, analytics | Any status transition           |
+| `booking.completed`         | booking         | payment, analytics                 | Visit completed                 |
+| `booking.cancelled`         | booking         | notifications, analytics           | Cancel by either party          |
+| `payment.completed`         | payment         | booking, notifications, analytics  | Payment confirmed               |
+| `payment.failed`            | payment         | notifications, admin               | Payment failure                 |
+| `wallet.credited`           | payment         | notifications                      | Nurse wallet credited           |
+| `wallet.prepaid.low`        | payment         | notifications, admin               | Prepaid balance below threshold |
+| `nurse.verified`            | users           | notifications                      | Admin approves nurse            |
+| `nurse.license.expiring`    | users           | notifications                      | 30d / 7d warning                |
+| `nurse.license.expired`     | users           | booking, notifications             | Auto-suspend                    |
+| `nurse.location.updated`    | location        | booking                            | Active booking tracking         |
+| `chat.message.sent`         | chat            | notifications                      | New chat message                |
+| `rating.submitted`          | booking         | users, analytics                   | Rating saved                    |
+| `dispute.opened`            | booking         | admin, notifications               | Dispute filed                   |
+| `user.anonymized`           | users           | analytics                          | Account deleted                 |
 
 
 ---
@@ -799,16 +858,16 @@ Defined in `src/events/`. Each event has: `eventId`, `eventType`, `timestamp`, `
 ## 15. Sprint Plan (Backend Focus)
 
 
-| Sprint | Backend Deliverables                                                                                                               | Dependencies |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| **S1** | NestJS scaffold, Docker, CI, `auth` + `users` modules (OTP stub, profile), global guards, Prisma schema                          | —            |
-| **S2** | Nurse docs (MinIO), `admin` auth + verification, `notifications` stub (FCM), service catalog CRUD                                  | S1           |
-| **S3** | `booking` module: request creation, PostGIS matching, offers, WebSocket events                                                    | S2           |
-| **S4** | Booking state machine, nurse confirm, cancellation + reassignment                                                                  | S3           |
-| **S5** | `location` tracking, `chat` module, scheduled booking cron                                                                       | S4           |
-| **S6** | SOS flow, cash payment, prepaid balance, admin dashboard APIs                                                                      | S5           |
-| **S7** | Paymob + Fawry, wallet + ledger, ratings, commission engine                                                                        | S6           |
-| **S8** | Withdrawals, disputes, `analytics` stubs, audit logs, load testing, prod Docker                                                      | S7           |
+| Sprint | Backend Deliverables                                                                                    | Dependencies |
+| ------ | ------------------------------------------------------------------------------------------------------- | ------------ |
+| **S1** | NestJS scaffold, Docker, CI, `auth` + `users` modules, Mongoose schemas, global guards              | —            |
+| **S2** | Nurse docs (MinIO), `admin` auth + verification, `notifications` stub (FCM), service catalog CRUD       | S1           |
+| **S3** | `booking` module: request creation, `$geoNear` nurse matching, offers, WebSocket events             | S2           |
+| **S4** | Booking state machine, nurse confirm, cancellation + reassignment                                       | S3           |
+| **S5** | `location` tracking, `chat` module, scheduled booking cron                                              | S4           |
+| **S6** | SOS flow, cash payment, prepaid balance, admin dashboard APIs                                           | S5           |
+| **S7** | Paymob + Fawry, wallet + ledger, ratings, commission engine                                             | S6           |
+| **S8** | Withdrawals, disputes, `analytics` stubs, audit logs, load testing, prod Docker                         | S7           |
 
 
 **Milestone gates:**
@@ -825,16 +884,16 @@ Defined in `src/events/`. Each event has: `eventId`, `eventType`, `timestamp`, `
 These are **algorithmic**, not ML, for MVP:
 
 
-| Module                   | Location          | Description                                      |
-| ------------------------ | ----------------- | ------------------------------------------------ |
-| Offer scoring            | `booking`         | `rating×0.4 + price×0.3 + eta×0.3` normalization |
-| Commission calculator    | `payment`         | Per-service rate lookup + ledger entries         |
-| SOS pricing              | `booking`         | 1.5× rolling 30-day average                      |
-| Prepaid balance guard    | `payment`         | Block go-online if < EGP 100                     |
-| License expiry cron      | `users`           | Daily job: 30d/7d warnings + suspend             |
-| Scheduled broadcast cron | `booking`         | Every minute: `broadcast_at <= now`              |
-| Chat content filter      | `chat`            | Basic profanity/PII regex (optional MVP)         |
-| Analytics aggregator     | `analytics`       | Outbox poller + daily rollup cron → PostgreSQL   |
+| Module                   | Location    | Description                                      |
+| ------------------------ | ----------- | ------------------------------------------------ |
+| Offer scoring            | `booking`   | `rating×0.4 + price×0.3 + eta×0.3` normalization |
+| Commission calculator    | `payment`   | Per-service rate lookup + ledger entries         |
+| SOS pricing              | `booking`   | 1.5× rolling 30-day average                      |
+| Prepaid balance guard    | `payment`   | Block go-online if < EGP 100                     |
+| License expiry cron      | `users`     | Daily job: 30d/7d warnings + suspend             |
+| Scheduled broadcast cron | `booking`   | Every minute: `broadcast_at <= now`              |
+| Chat content filter      | `chat`      | Basic profanity/PII regex (optional MVP)         |
+| Analytics aggregator     | `analytics` | Outbox poller + daily rollup cron → MongoDB      |
 
 
 ---
@@ -901,14 +960,14 @@ These are **algorithmic**, not ML, for MVP:
 - **DTOs** for all request/response bodies
 - **Idempotency-Key** header on payment and booking mutation endpoints
 - **correlationId** propagated via `X-Request-Id` middleware (same process)
-- **UTC** for all timestamps; store `timestamptz` in PostgreSQL
+- **UTC** for all timestamps; store as `Date` in MongoDB
 - **UUID v4** for all primary keys
 - **Soft delete** for users (anonymize); hard delete never for financial records
 
 ### Testing
 
 - Unit tests: services, utils, state machine transitions
-- Integration tests: API e2e with testcontainers (PostgreSQL)
+- Integration tests: API e2e with testcontainers (MongoDB)
 - Contract tests: event payload types in `src/events/`
 - Minimum: health e2e + one stub per module from day 1
 
@@ -948,7 +1007,7 @@ See `BACKEND_AGENT_PROMPT.md` § Environment Variables for full `.env.example` l
 | Egypt-only                   | EGP, Egyptian phone validation, local payment rails |
 | Arabic-only UI               | User-facing `message` fields in Arabic              |
 | Manual nurse verification    | Admin APIs + document storage + SLA tracking        |
-| No nurse zone restrictions   | PostGIS radius only; no hard city boundaries        |
+| No nurse zone restrictions   | `$geoNear` radius only; no hard city boundaries     |
 | Text-only chat (MVP)         | No file upload in chat                              |
 | Independent contractor model | Nurses are not employees — no payroll APIs          |
 | Egyptian Data Protection     | Anonymization, 30-day deletion SLA, audit logs      |
@@ -967,4 +1026,4 @@ When **done**: verify against Section 4 decisions + Section 15 sprint scope + ac
 
 ---
 
-*End of Backend Agent Context — Nabdh Platform v1.3*
+*End of Backend Agent Context — Nabdh Platform v1.4*

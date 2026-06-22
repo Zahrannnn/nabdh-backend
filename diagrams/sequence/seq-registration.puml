@@ -1,0 +1,225 @@
+@startuml
+skinparam backgroundColor #FCFCFC
+skinparam participantBorderColor #1A5676
+skinparam participantFontColor #1A5676
+skinparam participantFontSize 13
+skinparam arrowColor #555555
+skinparam sequenceLifeLineBorderColor #2E86AB
+skinparam sequenceLifeLineBackgroundColor #E8F4F8
+skinparam noteBackgroundColor #FFFCE8
+skinparam noteBorderColor #D4A017
+skinparam titleFontSize 16
+skinparam titleFontColor #1A5676
+
+title **Registration Sequence Diagram** (Patient & Nurse)
+
+actor "User\n(Patient / Nurse)" as USER
+participant "Mobile App" as APP
+participant "API Gateway" as GW
+participant "Auth Service" as AUTH
+participant "User Service" as USR
+participant "SMS Gateway" as SMS
+participant "Database" as DB
+
+== Step 1: Initiate Registration ==
+
+USER -> APP: Open app → Tap "Register"
+APP -> APP: Display role selection (Patient / Nurse)
+USER -> APP: Select role
+APP -> APP: Show phone number input screen
+USER -> APP: Enter mobile phone number
+
+APP -> APP: Validate phone format (Egyptian: 01xxxxxxxxx)
+alt Invalid format
+    APP --> USER: "Please enter a valid Egyptian phone number"
+    USER -> USER: exits
+else Valid format
+end
+
+APP -> GW: POST /api/v1/auth/otp/send
+note right
+  Payload: { "phone": "010xxxxxxx",
+             "role": "PATIENT" | "NURSE" }
+end note
+
+GW -> AUTH: Forward OTP request
+AUTH -> AUTH: Check rate limit per phone
+
+alt Rate limited
+    AUTH --> GW: 429 Too Many Requests
+    GW --> APP: "Please wait before requesting another OTP"
+    APP --> USER: Error message
+    USER -> USER: exits
+else Not rate limited
+end
+
+== Step 2: Generate & Send OTP ==
+
+AUTH -> AUTH: Generate 6-digit OTP
+AUTH -> AUTH: Hash OTP (bcrypt)
+AUTH -> AUTH: Set expiry = now + 5 minutes
+AUTH -> DB: Store OTP record {phone, hashed_otp, expiry, role, attempts=0}
+DB --> AUTH: OTP stored
+
+AUTH -> SMS: Send SMS (phone, otp_plaintext)
+SMS -> SMS: Dispatch via SMS provider
+SMS --> AUTH: SMS delivery confirmation
+
+AUTH -> AUTH: Log audit: OTP sent
+
+AUTH --> GW: { success: true, message: "OTP sent" }
+GW --> APP: OTP sent notification
+
+alt If User already exists
+    APP --> USER: "Welcome back! Enter the OTP to log in"
+else New user
+    APP --> USER: "OTP sent to {phone}. Enter code to register"
+end
+
+== Step 3: User Enters OTP ==
+
+USER -> APP: Enter 6-digit OTP
+APP -> APP: Validate input (6 digits only)
+APP -> GW: POST /api/v1/auth/otp/verify
+note right
+  Payload: { "phone": "010xxxxxxx",
+             "otp": "123456",
+             "device_info": {...} }
+end note
+
+GW -> AUTH: Forward verification request
+
+AUTH -> DB: Fetch OTP record for phone
+DB --> AUTH: { hashed_otp, expiry, attempts, role }
+
+AUTH -> AUTH: Check if OTP expired
+alt OTP expired
+    AUTH --> GW: 410 Gone — "OTP expired"
+    GW --> APP: "Code expired. Request a new one."
+    APP --> USER: Show "Resend OTP" button
+    USER -> USER: exits
+else OTP valid
+end
+
+AUTH -> AUTH: Verify OTP against stored hash
+AUTH -> AUTH: Increment attempts counter
+alt Max attempts exceeded
+    AUTH --> GW: 429 — "Too many attempts. Request new OTP."
+    GW --> APP: "Too many incorrect attempts"
+    APP --> USER: Prompt to resend OTP
+    USER -> USER: exits
+else Attempts remaining
+end
+
+alt OTP incorrect
+    AUTH --> GW: 401 — "Invalid OTP"
+    GW --> APP: "Incorrect code. {remaining} attempts left."
+    APP --> USER: Show error + remaining attempts
+    USER -> USER: exits
+else OTP correct
+end
+
+== Step 4: Create / Authenticate User ==
+
+AUTH -> AUTH: OTP valid — check if user exists
+
+AUTH -> USR: Lookup user by phone
+USR -> DB: SELECT * FROM users WHERE phone = ?
+DB --> USR: user record (or null)
+
+alt Existing User
+    USR --> AUTH: User found
+    AUTH -> AUTH: Generate JWT access token (15 min)
+    AUTH -> AUTH: Generate refresh token (30 days)
+    AUTH -> DB: Store refresh token
+    AUTH -> AUTH: Log audit: Login via OTP
+
+    AUTH --> GW: { success, tokens, user_profile }
+    GW --> APP: Authentication response
+    APP -> APP: Store tokens securely (keychain)
+    APP --> USER: "Welcome back, {name}!"
+
+    note right
+      If role = NURSE and
+      verification_status ≠ APPROVED:
+      redirect to verification status screen
+    end note
+
+else New User
+    USR --> AUTH: User not found — create account
+    AUTH -> USR: Create user account
+
+    USR -> USR: Determine user type from role
+    USR -> DB: INSERT INTO users {phone, type, status=ACTIVE}
+    DB --> USR: user_id
+
+    alt Role = PATIENT
+        USR -> DB: INSERT INTO patient {user_id}
+    else Role = NURSE
+        USR -> DB: INSERT INTO nurse {user_id, verification_status=PENDING}
+        note right
+          Nurse must upload documents
+          and await admin approval
+          before going online
+        end note
+    end
+
+    DB --> USR: Profile created
+    USR --> AUTH: User created
+
+    AUTH -> AUTH: Generate JWT access token (15 min)
+    AUTH -> AUTH: Generate refresh token (30 days)
+    AUTH -> DB: Store refresh token
+    AUTH -> AUTH: Log audit: User registered via OTP
+
+    AUTH --> GW: { success, tokens, user_profile (type-dependent) }
+    GW --> APP: Registration complete
+
+    APP -> APP: Store tokens securely (keychain)
+
+    alt Role = PATIENT
+        APP --> USER: "Welcome to Nabdh! Complete your profile."
+        APP -> APP: Navigate to profile setup screen
+    else Role = NURSE
+        APP --> USER: "Welcome! Please upload your documents for verification."
+        APP -> APP: Navigate to document upload screen
+    end
+end
+
+== Step 5: Token Refresh (Background) ==
+
+note right #FFFCE8
+  Token lifecycle:
+  - Access token: 15 minutes
+  - Refresh token: 30 days
+  - Auto-refresh on 401 response
+  - Logout revokes refresh token
+end note
+
+APP -> APP: Intercept 401 response
+APP -> GW: POST /api/v1/auth/refresh
+note right: Payload: { "refresh_token": "..." }
+
+GW -> AUTH: Validate refresh token
+AUTH -> DB: Check refresh token exists & not revoked
+DB --> AUTH: Token valid
+
+AUTH -> AUTH: Generate new access token
+AUTH --> GW: { access_token, expires_in }
+GW --> APP: New access token
+APP -> APP: Replace stored access token
+
+== Error Handling Summary ==
+
+note right #FFFCE8
+  Error responses:
+  - 400: Invalid phone / OTP format
+  - 401: Invalid OTP
+  - 404: Phone not registered (login)
+  - 409: Phone already exists (register)
+  - 410: OTP expired
+  - 429: Rate limited
+  - 500: Server error
+end note
+
+@enduml

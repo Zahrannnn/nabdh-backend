@@ -1,0 +1,113 @@
+@startuml
+
+skinparam backgroundColor #FCFCFC
+skinparam actorBorderColor #1A5676
+skinparam actorFontColor #1A5676
+skinparam actorFontSize 14
+skinparam usecaseBorderColor #2E86AB
+skinparam usecaseFontColor #1A5676
+skinparam usecaseFontSize 12
+skinparam usecaseBackgroundColor #E8F4F8
+skinparam arrowColor #555555
+skinparam packageBackgroundColor #F0F5FA
+skinparam packageBorderColor #1A5676
+skinparam packageFontStyle bold
+skinparam packageFontSize 13
+skinparam titleFontSize 16
+skinparam titleFontColor #1A5676
+skinparam noteBackgroundColor #FFFCE8
+skinparam noteBorderColor #D4A017
+
+left to right direction
+
+title **Nabdh Platform** — Patient Use Case Diagram
+
+actor "Patient" as Patient
+
+rectangle "**Patient App Features**" {
+  usecase "Register / Login via OTP" as UC1
+  usecase "Manage Profile\n(Name, Photo, DOB, Gender)" as UC2
+  usecase "Manage Saved\nAddresses" as UC3
+  usecase "Browse Service\nCategories" as UC4
+  usecase "Create Service\nRequest" as UC5
+  usecase "Schedule Booking\n(Future Date/Time)" as UC6
+  usecase "Filter by Gender\nPreference" as UC7
+  usecase "Trigger SOS\nEmergency" as UC8
+
+  usecase "Receive & Compare\nOffers in Real-Time" as UC9
+  usecase "View Nurse\nFull Profile" as UC10
+  usecase "Select Nurse\n& Confirm" as UC11
+  usecase "Cancel Request\n/ Booking" as UC12
+
+  usecase "Track Nurse\non Live Map" as UC13
+  usecase "Chat with Nurse\n(Text Only)" as UC14
+  usecase "Pay for Service" as UC15
+  usecase "Rate & Review\nNurse (1-5 Stars)" as UC16
+
+  usecase "View Booking\nHistory" as UC17
+  usecase "Re-book Previous\nService" as UC18
+  usecase "Receive Push\nNotifications" as UC19
+  usecase "Delete Account\n(Anonymize)" as UC21
+  usecase "Verify OTP" as UC1_OTP
+}
+
+rectangle "**Payment Methods**" {
+  usecase "Pay via Card\n(Paymob)" as PAY1
+  usecase "Pay via Fawry\n(Reference #)" as PAY2
+  usecase "Pay via Cash\n(On-Site)" as PAY3
+}
+
+' ── PATIENT ASSOCIATIONS ────────────────────────────────────
+Patient --> UC1
+Patient --> UC2
+Patient --> UC3
+Patient --> UC4
+Patient --> UC5
+Patient --> UC6
+Patient --> UC7
+Patient --> UC8
+Patient --> UC9
+Patient --> UC10
+Patient --> UC11
+Patient --> UC12
+Patient --> UC13
+Patient --> UC14
+Patient --> UC15
+Patient --> UC16
+Patient --> UC17
+Patient --> UC18
+Patient --> UC19
+Patient --> UC21
+
+Patient --> PAY1
+Patient --> PAY2
+Patient --> PAY3
+
+' ── INCLUDE / EXTEND ────────────────────────────────────────
+UC1 ..> UC1_OTP : <<include>>
+
+UC5 ..> UC6 : <<extend>>
+UC5 ..> UC7 : <<extend>>
+
+' ── NOTES ───────────────────────────────────────────────────
+note right of UC6
+  Min 2 hours ahead
+  Max 7 days ahead
+  Broadcast 30 min before
+end note
+
+note right of UC8
+  No service type selected
+  Free-text description (max 300 chars)
+  First-accept auto-assignment
+  1.5x average market price
+  Rate limit: 1 per 15 min
+end note
+
+note left of UC12
+  Before nurse arrival: free
+  After confirmation: warning shown
+  (fee in Phase 2)
+end note
+
+@enduml

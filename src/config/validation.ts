@@ -23,6 +23,9 @@ export const validationSchema = Joi.object({
   FAWRY_MERCHANT_CODE: Joi.string().default('stub'),
   FCM_SERVER_KEY: Joi.string().default('stub'),
   SMS_PROVIDER: Joi.string().default('stub'),
+  TWILIO_ACCOUNT_SID: Joi.string().default(''),
+  TWILIO_AUTH_TOKEN: Joi.string().default(''),
+  TWILIO_FROM_NUMBER: Joi.string().default(''),
   OSRM_BASE_URL: Joi.string().default('http://router.project-osrm.org'),
 
   COMMISSION_RATE_DEFAULT: Joi.number().default(0.18),

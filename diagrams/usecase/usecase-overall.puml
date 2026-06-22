@@ -1,0 +1,144 @@
+@startuml
+!define RICH_ACTOR
+
+skinparam backgroundColor #FCFCFC
+skinparam actorBorderColor #1A5676
+skinparam actorFontColor #1A5676
+skinparam actorFontSize 14
+skinparam usecaseBorderColor #2E86AB
+skinparam usecaseFontColor #1A5676
+skinparam usecaseFontSize 12
+skinparam usecaseBackgroundColor #E8F4F8
+skinparam arrowColor #555555
+skinparam packageBackgroundColor #F0F5FA
+skinparam packageBorderColor #1A5676
+skinparam packageFontStyle bold
+skinparam packageFontSize 14
+skinparam titleFontSize 18
+skinparam titleFontColor #1A5676
+
+left to right direction
+
+title **Nabdh Platform** — System-Level Use Case Diagram
+
+' ── ACTORS ──────────────────────────────────────────────────
+
+actor "Patient" as Patient <<patient>>
+actor "Nursing Professional\n(ممرض / ممرضة)" as Nurse <<nurse>>
+actor "Admin\n(Operations)" as Admin <<admin>>
+actor "Super Admin\n(System)" as SuperAdmin <<superadmin>>
+
+' ── PAYMENT PARTNERS (External) ─────────────────────────────
+actor "Payment Gateway\n(Paymob)" as Paymob <<external>>
+actor "Payment Gateway\n(Fawry)" as Fawry <<external>>
+
+' ── SYSTEM BOUNDARY ─────────────────────────────────────────
+
+rectangle "**Authentication & Account**" {
+  usecase "Register / Login\nvia OTP" as UC_AUTH_01
+  usecase "Manage Profile" as UC_AUTH_02
+}
+
+rectangle "**Patient Services**" {
+  usecase "Browse Services" as UC_PAT_01
+  usecase "Create Service Request" as UC_PAT_02
+  usecase "Schedule Booking" as UC_PAT_03
+  usecase "Trigger SOS Emergency" as UC_PAT_04
+  usecase "View & Compare Offers" as UC_PAT_05
+  usecase "Select & Confirm Nurse" as UC_PAT_06
+  usecase "Filter by Gender\nPreference" as UC_PAT_07
+  usecase "Cancel Request\n/ Booking" as UC_PAT_08
+}
+
+rectangle "**Visit & Tracking**" {
+  usecase "Track Nurse\n(Live Map)" as UC_TRK_01
+  usecase "Chat with Nurse" as UC_TRK_02
+  usecase "Rate & Review\nNurse" as UC_TRK_03
+  usecase "Manage Visit\nLifecycle" as UC_VST_01
+  usecase "Navigate to\nPatient Location" as UC_VST_02
+}
+
+rectangle "**Payments & Wallet**" {
+  usecase "Pay for Service\n(Cash / Card / Fawry)" as UC_PAY_01
+  usecase "View Wallet &\nEarnings" as UC_WAL_01
+  usecase "Process Commission\nDeduction" as UC_PAY_02
+  usecase "Request Withdrawal" as UC_WAL_02
+}
+
+rectangle "**Supply-Side Operations**" {
+  usecase "Upload Verification\nDocuments" as UC_SUP_01
+  usecase "Toggle\nAvailability" as UC_SUP_02
+  usecase "Submit Price\nOffer" as UC_SUP_03
+  usecase "Confirm / Reject\nAssignment" as UC_SUP_04
+  usecase "Accept SOS\nRequest" as UC_SUP_05
+  usecase "Rate Patient" as UC_SUP_06
+}
+
+rectangle "**Admin Operations**" {
+  usecase "Verify Nurse\nDocuments" as UC_ADM_01
+  usecase "Manage All Users\n(Suspend/Ban)" as UC_ADM_02
+  usecase "View & Manage\nAll Bookings" as UC_ADM_03
+  usecase "Handle Disputes\n& Refunds" as UC_ADM_04
+  usecase "Generate Reports\n& Analytics" as UC_ADM_05
+  usecase "Manage Service\nCategories" as UC_ADM_06
+  usecase "Configure Commission\nRates" as UC_ADM_07
+  usecase "View Audit\nLogs" as UC_ADM_08
+  usecase "Broadcast\nNotifications" as UC_ADM_09
+}
+
+' ── ASSOCIATIONS - PATIENT ──────────────────────────────────
+Patient --> UC_AUTH_01
+Patient --> UC_AUTH_02
+Patient --> UC_PAT_01
+Patient --> UC_PAT_02
+Patient --> UC_PAT_03
+Patient --> UC_PAT_04
+Patient --> UC_PAT_05
+Patient --> UC_PAT_06
+Patient --> UC_PAT_07
+Patient --> UC_PAT_08
+Patient --> UC_TRK_01
+Patient --> UC_TRK_02
+Patient --> UC_TRK_03
+Patient --> UC_PAY_01
+
+' ── ASSOCIATIONS - NURSE ────────────────────────────────────
+Nurse --> UC_AUTH_01
+Nurse --> UC_AUTH_02
+Nurse --> UC_SUP_01
+Nurse --> UC_SUP_02
+Nurse --> UC_SUP_03
+Nurse --> UC_SUP_04
+Nurse --> UC_SUP_05
+Nurse --> UC_VST_01
+Nurse --> UC_VST_02
+Nurse --> UC_TRK_02
+Nurse --> UC_SUP_06
+Nurse --> UC_WAL_01
+Nurse --> UC_WAL_02
+
+' ── ASSOCIATIONS - ADMIN ────────────────────────────────────
+Admin --> UC_ADM_01
+Admin --> UC_ADM_02
+Admin --> UC_ADM_03
+Admin --> UC_ADM_04
+Admin --> UC_ADM_05
+Admin --> UC_ADM_06
+Admin --> UC_ADM_08
+Admin --> UC_ADM_09
+
+' ── ASSOCIATIONS - SUPER ADMIN ──────────────────────────────
+SuperAdmin --> UC_ADM_07
+SuperAdmin -up-|> Admin
+
+' ── ASSOCIATIONS - EXTERNAL SYSTEMS ────────────────────────
+UC_PAY_01 --> Paymob : processes →
+UC_PAY_01 --> Fawry : processes →
+
+' ── INCLUDE / EXTEND RELATIONSHIPS ──────────────────────────
+UC_PAT_02 ..> UC_PAT_03 : <<extend>>
+UC_PAT_02 ..> UC_PAT_07 : <<extend>>
+UC_PAT_04 ..> UC_SUP_05 : <<extend>>
+UC_PAY_01 ..> UC_PAY_02 : <<include>>
+
+@enduml

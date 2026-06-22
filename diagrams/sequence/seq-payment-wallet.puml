@@ -1,0 +1,229 @@
+@startuml
+skinparam backgroundColor #FCFCFC
+skinparam participantBorderColor #8E44AD
+skinparam participantFontColor #8E44AD
+skinparam participantFontSize 13
+skinparam sequenceActorBorderColor #8E44AD
+skinparam sequenceActorFontColor #8E44AD
+skinparam arrowColor #555555
+skinparam sequenceLifeLineBorderColor #8E44AD
+skinparam sequenceLifeLineBackgroundColor #F4ECF7
+skinparam sequenceBoxBorderColor #8E44AD
+skinparam sequenceBoxFontColor #8E44AD
+skinparam sequenceBoxBackgroundColor #F4ECF7
+skinparam noteBackgroundColor #F4ECF7
+skinparam noteBorderColor #8E44AD
+
+title **Payment & Wallet Flow** — Sequence Diagram
+
+actor "Patient" as PAT
+participant "Patient App" as PAPP
+participant "API Gateway" as GW
+participant "Payment\nService" as PAY
+participant "Wallet\nService" as WAL
+participant "Ledger" as LED
+participant "Nurse App" as NAPP
+actor "Nurse" as NUR
+participant "Admin Panel" as ADMP
+
+== Payment Initiation ==
+
+note right #F4ECF7
+  Triggered after VISIT_COMPLETED
+  Patient selects payment method
+end note
+
+PAT -> PAPP: Select payment method
+
+alt === Card Payment via Paymob ===
+
+  PAT -> PAPP: Select "Card (Paymob)"
+  PAPP -> GW: POST /api/v1/payments/initiate
+  GW -> PAY: Create payment intent
+
+  PAY -> PAY: Validate booking & amount
+  PAY -> PAY: Generate unique transaction ID
+  PAY -> PAY: Create Paymob payment intent
+  PAY --> GW: Payment form URL / SDK token
+  GW --> PAPP: Payment form data
+
+  PAPP -> PAPP: Open Paymob SDK/iframe
+  PAT -> PAPP: Enter card details
+  PAPP -> PAYM: process card (via Paymob SDK)
+
+  group Paymob Webhook
+    PAYM -> PAY: POST /api/v1/payments/webhook/paymob
+    PAY -> PAY: Verify webhook signature
+    PAY -> PAY: Validate transaction reference
+
+    alt Payment Success
+      PAY -> PAY: Set payment status = COMPLETED
+      PAY -> PAY: Record provider_reference
+      PAY -> LED: Log transaction entry
+    else Payment Failed
+      PAY -> PAY: Set payment status = FAILED
+      PAY -> PAY: Log error details
+      PAY --> GW: Payment failed
+      GW --> PAPP: "Payment failed — please retry"
+      alt Retry
+        PAPP -> PAY: Retry payment
+      else Fallback
+        PAPP -> PAY: Switch to cash
+      end
+    end
+  end
+
+else === Fawry Payment ===
+
+  PAT -> PAPP: Select "Fawry"
+  PAPP -> GW: Request Fawry payment
+  GW -> PAY: Create Fawry order
+
+  PAY -> PAY: Generate Fawry reference number
+  PAY --> GW: Fawry reference code
+  GW --> PAPP: Display reference number + barcode
+
+  PAPP --> PAT: "Pay at any Fawry outlet or Fawry app"
+  PAT -> FAWRY: Pay at Fawry outlet / app
+
+  group Fawry Webhook
+    FAWRY -> PAY: POST /api/v1/payments/webhook/fawry
+    PAY -> PAY: Verify webhook signature
+    PAY -> PAY: Set payment status = COMPLETED
+    PAY -> LED: Log transaction
+  end
+
+else === Cash Payment ===
+
+  PAT -> PAPP: Select "Cash"
+  PAPP -> GW: Mark payment as CASH
+
+  note right #F4ECF7
+    Nurse collects full amount in cash
+    Platform commission deducted from
+    nurse's prepaid balance
+  end note
+
+  GW -> PAY: Record cash transaction
+  PAY -> PAY: Set payment status = COMPLETED (cash)
+  PAY -> WAL: Process commission for cash visit
+
+  WAL -> WAL: Check nurse prepaid balance
+  alt Sufficient Balance
+    WAL -> WAL: Debit commission from prepaid balance
+    WAL -> LED: Log commission debit
+  else Insufficient Balance
+    WAL -> WAL: Create negative adjustment (debt)
+    WAL -> WAL: Track debt for future earnings deduction
+    WAL -> NAPP: Push "Prepaid balance low — please top up"
+    NAPP --> NUR: "Your prepaid balance is low (EGP {balance})"
+    WAL -> ADMP: Alert admin of negative commission balance
+  end
+
+end
+
+== Ledger Entries (All Payment Types) ==
+
+note right #F4ECF7
+  Double-entry bookkeeping:
+  Every transaction has a debit
+  and a corresponding credit
+end note
+
+group Ledger Recording
+  PAY -> LED: Record: Patient Payment Account (DR) → Platform Holding (CR)
+  PAY -> LED: Record: Commission Deducted (DR) → Platform Revenue (CR)
+  PAY -> LED: Record: Platform Holding (DR) → Nurse Wallet (CR)
+end
+
+== Commission Calculation ==
+
+note right #F4ECF7
+  Commission rate: 15-20%
+  Configurable per service type
+  Set by Super Admin
+end note
+
+PAY -> PAY: Calculate commission
+PAY -> PAY: gross_amount = agreed_price
+PAY -> PAY: commission_rate = getRateForServiceType()
+PAY -> PAY: commission_amount = gross_amount * commission_rate
+PAY -> PAY: nurse_earnings = gross_amount - commission_amount
+
+PAY -> WAL: Credit nurse earnings
+WAL -> WAL: Add to nurse wallet balance
+WAL -> WAL: Update total_earned, total_commission
+WAL -> LED: Record wallet credit transaction
+
+WAL --> PAY: Wallet credited
+PAY --> GW: Payment complete
+GW --> PAPP: "Payment successful ✓"
+PAPP --> PAT: Receipt displayed
+
+== Nurse Wallet Notification ==
+
+NAPP -> WAL: GET /api/v1/nurse/wallet
+WAL --> NAPP: Wallet balance + pending
+
+NUR -> NAPP: View wallet dashboard
+NAPP --> NUR: Display balance & earnings
+
+note right #F4ECF7
+  Wallet dashboard shows:
+  - Available balance
+  - Pending balance
+  - Total earnings
+  - Total commission paid
+  - Recent transactions
+  - Withdrawal button
+end note
+
+== Withdrawal Flow ==
+
+NUR -> NAPP: Tap "Withdraw"
+NAPP -> NAPP: Show withdrawal options
+
+note right #F4ECF7
+  Withdrawal methods:
+  - Vodafone Cash
+  - Etisalat Cash / WE Pay
+  - InstaPay
+  Minimum: EGP 100
+  Processing: 1-3 business days
+end note
+
+NUR -> NAPP: Select amount & method
+NUR -> NAPP: Confirm withdrawal
+
+NAPP -> GW: POST /api/v1/nurse/wallet/withdraw
+GW -> PAY: Process withdrawal request
+
+PAY -> PAY: Validate minimum balance
+PAY -> WAL: Check available_balance >= withdrawal_amount
+alt Valid
+  WAL -> WAL: Debit withdrawal amount from available_balance
+  WAL -> WAL: Set transaction = WITHDRAWAL (pending)
+  WAL -> LED: Record withdrawal request
+  PAY --> GW: Withdrawal request submitted
+  GW --> NAPP: "Withdrawal request submitted (1-3 business days)"
+  NAPP --> NUR: Withdrawal pending
+  PAY -> ADMP: Notify admin of pending withdrawal
+else Invalid
+  PAY --> GW: Error: insufficient balance / below minimum
+  GW --> NAPP: "Minimum withdrawal: EGP 100"
+  NAPP --> NUR: Show error
+end
+
+== Admin Withdrawal Processing ==
+
+ADMP -> ADMP: View pending withdrawal queue
+ADM -> ADMP: Review withdrawal request
+ADM -> ADMP: Process payment to nurse
+
+ADMP -> PAY: Mark withdrawal as completed
+PAY -> WAL: Update transaction status = COMPLETED
+PAY -> NOT: Push "Withdrawal completed"
+NOT --> NAPP: "Your withdrawal of EGP {amount} has been processed ✓"
+NAPP --> NUR: Withdrawal completed
+
+@enduml

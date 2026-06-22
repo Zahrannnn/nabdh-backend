@@ -1,0 +1,176 @@
+@startuml
+skinparam backgroundColor #FCFCFC
+skinparam participantBorderColor #C0392B
+skinparam participantFontColor #C0392B
+skinparam participantFontSize 13
+skinparam sequenceActorBorderColor #C0392B
+skinparam sequenceActorFontColor #C0392B
+skinparam arrowColor #555555
+skinparam sequenceLifeLineBorderColor #E74C3C
+skinparam sequenceLifeLineBackgroundColor #FDEDEC
+skinparam sequenceBoxBorderColor #C0392B
+skinparam sequenceBoxFontColor #C0392B
+skinparam sequenceBoxBackgroundColor #FDEDEC
+skinparam noteBackgroundColor #FDEDEC
+skinparam noteBorderColor #E74C3C
+
+title **Dispute Resolution & Refund** — Sequence Diagram
+
+actor "Patient" as PAT
+participant "Patient App" as PAPP
+participant "API Gateway" as GW
+participant "Booking\nService" as BKS
+participant "Admin Panel" as ADMP
+actor "Admin" as ADM
+actor "Nurse" as NUR
+participant "Wallet\nService" as WAL
+participant "Ledger" as LED
+participant "Notification\nService" as NOT
+
+== Dispute Initiation ==
+
+note right #FDEDEC
+  Patient can initiate dispute within 72 hours
+  of visit completion (MVP: via customer support)
+end note
+
+PAT -> PAPP: Contact support / Submit dispute
+PAPP -> GW: POST /api/v1/bookings/{id}/dispute
+GW -> BKS: Flag booking for dispute
+
+BKS -> BKS: Set booking status = DISPUTE
+BKS -> BKS: Freeze payment if in-app (hold)
+BKS -> BKS: Lock rating (prevent modification)
+BKS -> NOT: Alert admin team
+NOT -> ADMP: "New dispute requires attention"
+
+ADMP -> ADMP: Show dispute in dedicated queue
+
+== Admin Review ==
+
+ADM -> ADMP: Select disputed booking
+ADMP -> ADMP: Display full booking details
+
+note right #FDEDEC
+  Admin review includes:
+  - Booking history & status timeline
+  - Chat messages between parties
+  - Nurse tracking data (GPS history)
+  - Visit timestamps
+  - Previous disputes by either party
+end note
+
+ADM -> ADMP: Review evidence
+
+== Communication ==
+
+alt Admin requests more info
+  ADM -> PAPP: Message patient via support chat
+  PAT -> PAPP: Provide additional evidence
+
+  ADM -> NAPP: Message nurse via support chat
+  NUR -> NAPP: Provide response
+
+  ADM -> ADMP: Review additional evidence
+end
+
+== Admin Decision ==
+
+alt Ruling in Patient's Favor — Refund
+
+  ADM -> ADMP: Select "Issue Refund"
+  ADMP -> ADMP: Enter refund amount
+  ADMP -> ADMP: Enter admin notes
+
+  ADMP -> GW: POST /api/v1/admin/bookings/{id}/intervene
+  GW -> BKS: Process refund
+
+  BKS -> BKS: Set booking status = DISPUTE_REFUNDED
+  BKS -> WAL: Initiate refund deduction
+
+  note right #FDEDEC
+    Refund Policy:
+    Refund is DEDUCTED from nurse wallet.
+    If insufficient balance → negative adjustment
+    tracked as debt against future earnings.
+    Platform does NOT absorb dispute refunds.
+  end note
+
+  WAL -> WAL: Check nurse available_balance
+
+  alt Sufficient Balance
+    WAL -> WAL: Debit refund amount from nurse wallet
+    WAL -> LED: Record debit (type = ADJUSTMENT)
+  else Insufficient Balance
+    WAL -> WAL: Debit remaining balance to 0
+    WAL -> WAL: Create negative balance adjustment
+    WAL -> WAL: Track remaining debt against future earnings
+    WAL -> ADMP: Alert admin of negative balance
+    ADMP -> ADMP: Log debt tracking entry
+  end
+
+  WAL -> LED: Record double-entry refund ledger
+
+  par Notifications
+    BKS -> NOT: Push "Refund issued" to patient
+    NOT --> PAPP: "Your dispute has been resolved — refund issued ✓"
+    PAPP --> PAT: Refund confirmed
+
+    BKS -> NOT: Push "Refund deducted" to nurse
+    NOT --> NAPP: "Dispute resolved — refund of EGP {amount} deducted"
+    NAPP --> NUR: Dispute outcome notification
+
+    BKS -> ADMP: Update dispute resolution log
+  end
+
+else Ruling in Nurse's Favor — Reject
+
+  ADM -> ADMP: Select "Reject Dispute"
+  ADMP -> ADMP: Enter admin notes & justification
+
+  ADMP -> GW: POST /api/v1/admin/bookings/{id}/intervene
+  GW -> BKS: Process rejection
+
+  BKS -> BKS: Set booking status = DISPUTE_REJECTED
+  BKS -> BKS: Release any payment hold on in-app payments
+
+  par Notifications
+    BKS -> NOT: Push "Dispute rejected" to patient
+    NOT --> PAPP: "After review, your dispute has been declined: {reason}"
+    PAPP --> PAT: Dispute outcome
+
+    BKS -> NOT: Push "Dispute resolved" to nurse
+    NOT --> NAPP: "The dispute was resolved in your favor ✓"
+    NAPP --> NUR: Dispute outcome
+  end
+
+end
+
+== Audit Trail ==
+
+BKS -> BKS: Log complete audit entry
+
+note right #FDEDEC
+  Audit log captures:
+  - Actor ID (admin who handled)
+  - Action taken (refunded / rejected)
+  - Refund amount (if applicable)
+  - Wallet adjustment details
+  - Admin notes
+  - Timestamp of resolution
+end note
+
+== Booking Closure ==
+
+BKS -> BKS: Set final booking status
+BKS -> BKS: Auto-close after resolution
+
+note right #FDEDEC
+  Booking lifecycle ends:
+  - DISPUTE_REFUNDED → CLOSED
+  - DISPUTE_REJECTED → CLOSED
+  Booking & financial records retained
+  for compliance & tax purposes
+end note
+
+@enduml

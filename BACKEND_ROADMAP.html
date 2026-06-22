@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Nabdh Backend Implementation Roadmap — modular monolith NestJS + MongoDB. Phased plan, sprints, modules, risks, diagrams mapping.">
+<title>Nabdh Backend — Implementation Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>/* Nabdh Roadmap — shared tokens. Restrained dark, warm slate + amber accent. */
+:root {
+  --bg: oklch(0.18 0.015 250);
+  --bg-elev: oklch(0.21 0.015 250);
+  --surface: oklch(0.24 0.016 250);
+  --surface-2: oklch(0.27 0.017 250);
+  --border: oklch(0.32 0.018 250);
+  --border-strong: oklch(0.42 0.020 250);
+  --text: oklch(0.93 0.005 250);
+  --text-muted: oklch(0.70 0.010 250);
+  --text-faint: oklch(0.55 0.010 250);
+  --accent: oklch(0.78 0.14 65);
+  --accent-dim: oklch(0.55 0.10 65);
+  --accent-soft: oklch(0.30 0.05 65);
+  --success: oklch(0.72 0.15 150);
+  --warn: oklch(0.78 0.15 80);
+  --danger: oklch(0.68 0.18 25);
+  --info: oklch(0.75 0.13 230);
+  --max: 1400px;
+  --sidebar-w: 260px;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  --font-display: 'Fraunces', Georgia, serif;
+}
+
+/* Light theme overrides */
+html[data-theme="light"] {
+  --bg: oklch(0.98 0.005 250);
+  --bg-elev: oklch(0.96 0.006 250);
+  --surface: oklch(0.94 0.007 250);
+  --surface-2: oklch(0.91 0.008 250);
+  --border: oklch(0.86 0.010 250);
+  --border-strong: oklch(0.72 0.012 250);
+  --text: oklch(0.22 0.015 250);
+  --text-muted: oklch(0.45 0.012 250);
+  --text-faint: oklch(0.60 0.010 250);
+  --accent: oklch(0.62 0.16 65);
+  --accent-dim: oklch(0.50 0.12 65);
+  --accent-soft: oklch(0.92 0.04 65);
+  --success: oklch(0.50 0.16 150);
+  --warn: oklch(0.58 0.16 80);
+  --danger: oklch(0.52 0.20 25);
+  --info: oklch(0.48 0.15 230);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 32px; }
+@media (max-width: 720px) { .wrap { padding: 0 20px; } }
+
+/* Type scale — 1.25 ratio */
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.4rem, 5vw, 3.4rem); }
+h2 { font-size: clamp(1.7rem, 3vw, 2.2rem); margin-top: 4rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.35rem; margin-top: 2.4rem; }
+h4 { font-size: 1.05rem; margin-top: 1.8rem; font-family: var(--font-sans); font-weight: 600; letter-spacing: 0; }
+p { margin: 0.8rem 0; max-width: 72ch; }
+ul, ol { margin: 0.8rem 0 0.8rem 1.4rem; }
+li { margin: 0.3rem 0; }
+strong { color: var(--text); font-weight: 600; }
+em { color: var(--text-muted); font-style: italic; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--surface); padding: 0.1em 0.35em; border-radius: 3px; color: var(--accent); }
+pre { font-family: var(--font-mono); background: var(--surface); padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; }
+pre code { background: none; padding: 0; color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Lead paragraph */
+.lead { font-size: 1.15rem; color: var(--text-muted); max-width: 68ch; margin-top: 1rem; }
+
+/* Meta strip */
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 1.4rem; }
+.meta span { display: inline-flex; align-items: center; gap: 6px; }
+.meta span::before { content: ''; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+
+/* Section anchors */
+section { scroll-margin-top: 80px; padding-top: 1rem; }
+
+/* Tables — dense data, no zebra, hairline borders */
+.tbl-wrap { overflow-x: auto; margin: 1.4rem 0 2rem; border: 1px solid var(--border); border-radius: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+thead th {
+  text-align: left; padding: 12px 14px;
+  font-family: var(--font-sans); font-weight: 600; font-size: 0.78rem;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--surface); border-bottom: 1px solid var(--border-strong);
+  position: sticky; top: 0;
+}
+tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface); }
+td code, th code { font-size: 0.82em; }
+
+/* Status pills */
+.pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.03em; white-space: nowrap; }
+.pill-done { background: oklch(0.30 0.08 150); color: var(--success); border: 1px solid oklch(0.40 0.10 150); }
+.pill-partial { background: oklch(0.32 0.08 80); color: var(--warn); border: 1px solid oklch(0.42 0.10 80); }
+.pill-stub { background: oklch(0.32 0.06 250); color: var(--info); border: 1px solid oklch(0.42 0.08 250); }
+.pill-empty { background: oklch(0.30 0.06 25); color: var(--danger); border: 1px solid oklch(0.42 0.10 25); }
+.pill-missing { background: oklch(0.28 0.05 25); color: var(--danger); border: 1px solid oklch(0.40 0.08 25); }
+.pill-p0 { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-dim); }
+.pill-p1, .pill-p2, .pill-p3 { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+
+/* Complexity badges */
+.cx { font-family: var(--font-mono); font-size: 0.74rem; padding: 1px 8px; border-radius: 3px; border: 1px solid var(--border); }
+.cx-low { color: var(--success); border-color: oklch(0.40 0.10 150); }
+.cx-med { color: var(--warn); border-color: oklch(0.42 0.10 80); }
+.cx-high { color: var(--danger); border-color: oklch(0.42 0.10 25); }
+
+/* Module cards — collapsible */
+.module { border: 1px solid var(--border); border-radius: 8px; margin: 1.6rem 0; background: var(--bg-elev); overflow: hidden; }
+.module > .mod-head { display: flex; align-items: center; gap: 12px; padding: 18px 24px; cursor: pointer; user-select: none; border: none; background: none; width: 100%; text-align: left; color: inherit; font: inherit; }
+.module > .mod-head:hover { background: var(--surface); }
+.module > .mod-head .chevron { margin-left: auto; color: var(--text-faint); transition: transform 0.2s ease-out; font-family: var(--font-mono); font-size: 1.1rem; }
+.module.collapsed > .mod-head .chevron { transform: rotate(-90deg); }
+.module > .mod-head h3 { margin: 0; flex: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.module > .mod-head h3 .mod-status { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 500; }
+.module > .mod-body { padding: 0 28px 24px; }
+.module.collapsed > .mod-body { display: none; }
+.module dl { display: grid; grid-template-columns: minmax(140px, 180px) 1fr; gap: 10px 24px; margin-top: 1rem; }
+.module dt { font-family: var(--font-sans); font-weight: 600; font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.module dd { font-size: 0.92rem; }
+.module dd ul { margin: 0.2rem 0 0 1.2rem; }
+@media (max-width: 600px) { .module dl { grid-template-columns: 1fr; } .module dt { margin-top: 0.6rem; } }
+
+/* Callouts */
+.callout { border: 1px solid var(--border); border-radius: 6px; padding: 16px 20px; margin: 1.4rem 0; background: var(--surface); }
+.callout.warn { border-color: oklch(0.45 0.10 80); background: oklch(0.25 0.05 80); }
+.callout.danger { border-color: oklch(0.45 0.10 25); background: oklch(0.25 0.05 25); }
+.callout.info { border-color: oklch(0.45 0.10 230); background: oklch(0.25 0.05 230); }
+.callout-title { font-family: var(--font-sans); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.callout.warn .callout-title { color: var(--warn); }
+.callout.danger .callout-title { color: var(--danger); }
+.callout.info .callout-title { color: var(--info); }
+
+/* Checklist */
+.checklist { list-style: none; margin: 0.8rem 0; padding: 0; }
+.checklist li { padding-left: 28px; position: relative; margin: 0.4rem 0; color: var(--text-muted); }
+.checklist li::before { content: ''; position: absolute; left: 0; top: 6px; width: 16px; height: 16px; border: 1.5px solid var(--border-strong); border-radius: 3px; }
+.checklist li.checked { color: var(--text); }
+.checklist li.checked::before { background: var(--accent); border-color: var(--accent); }
+.checklist li.checked::after { content: ''; position: absolute; left: 4px; top: 9px; width: 8px; height: 4px; border-left: 2px solid var(--bg); border-bottom: 2px solid var(--bg); transform: rotate(-45deg); }
+
+/* Phase banner */
+.phase { display: flex; align-items: baseline; gap: 16px; margin: 3rem 0 1.2rem; padding-bottom: 0.8rem; border-bottom: 1px solid var(--border-strong); }
+.phase-tag { font-family: var(--font-mono); font-size: 0.78rem; padding: 3px 10px; border-radius: 3px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-dim); letter-spacing: 0.04em; text-transform: uppercase; }
+.phase-title { font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; }
+.phase-sub { color: var(--text-muted); font-size: 0.95rem; margin-left: auto; }
+
+/* Sprint block — collapsible */
+.sprint { border: 1px solid var(--border); border-radius: 8px; margin: 1.4rem 0; overflow: hidden; background: var(--bg-elev); }
+.sprint > .sprint-head { display: flex; align-items: baseline; gap: 16px; padding: 16px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; cursor: pointer; user-select: none; }
+.sprint > .sprint-head:hover { background: var(--surface-2); }
+.sprint > .sprint-head .chevron { margin-left: auto; color: var(--text-faint); transition: transform 0.2s ease-out; font-family: var(--font-mono); font-size: 1.1rem; }
+.sprint.collapsed > .sprint-head .chevron { transform: rotate(-90deg); }
+.sprint.collapsed .sprint-body { display: none; }
+.sprint-num { font-family: var(--font-mono); font-weight: 600; color: var(--accent); font-size: 0.95rem; }
+.sprint-title { font-family: var(--font-sans); font-weight: 600; font-size: 1.05rem; }
+.sprint-meta { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-faint); }
+.sprint-body { padding: 16px 24px; }
+.sprint-body table { font-size: 0.82rem; }
+.sprint-body td:first-child { font-family: var(--font-mono); color: var(--text-muted); white-space: nowrap; }
+.sprint-deliverables { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border); }
+.sprint-deliverables strong { color: var(--accent); font-family: var(--font-mono); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.sprint-acceptance { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.4rem; }
+.sprint-acceptance::before { content: '\2713  '; color: var(--success); font-weight: 700; }
+
+/* Dependency graph */
+.graph { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; overflow-x: auto; margin: 1.6rem 0; }
+.graph pre { background: none; padding: 0; color: var(--text-muted); font-size: 0.82rem; }
+
+/* Note blocks */
+.note { font-size: 0.88rem; color: var(--text-muted); padding: 12px 16px; background: var(--surface); border-radius: 4px; margin: 1rem 0; }
+.note::before { content: 'Note: '; color: var(--accent); font-weight: 600; }
+
+/* Grid for stat-like content (NOT card grid) */
+.dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin: 1.4rem 0; }
+.dl-grid > div { padding: 16px 20px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.dl-grid > div:nth-child(-n+2) { border-top: none; }
+@media (max-width: 600px) { .dl-grid > div { border-right: none; } }
+.dl-grid dt { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.dl-grid dd { font-size: 0.95rem; }
+
+/* Timeline */
+.timeline { position: relative; padding-left: 24px; margin: 1.6rem 0; }
+.timeline::before { content: ''; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 1px; background: var(--border-strong); }
+.timeline-item { position: relative; padding-bottom: 1.4rem; }
+.timeline-item::before { content: ''; position: absolute; left: -22px; top: 4px; width: 11px; height: 11px; border-radius: 50%; background: var(--bg); border: 2px solid var(--accent); }
+.timeline-item.done::before { background: var(--accent); }
+.timeline-item h4 { margin: 0 0 0.2rem; font-family: var(--font-sans); font-size: 0.95rem; font-weight: 600; }
+.timeline-item .t-meta { font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+.timeline-item p { margin: 0.3rem 0 0; font-size: 0.88rem; color: var(--text-muted); }
+
+/* ===== Layout shell: sidebar + main ===== */
+.layout { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
+.sidebar {
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  background: var(--bg-elev); border-right: 1px solid var(--border);
+  padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 16px;
+}
+.sidebar-brand { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; color: var(--text); padding: 4px 8px 8px; border-bottom: 1px solid var(--border); }
+.sidebar-brand span { color: var(--accent); }
+.sidebar-brand small { display: block; font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; font-weight: 400; }
+
+/* Search box */
+.search-wrap { position: relative; }
+.search {
+  width: 100%; padding: 8px 12px 8px 32px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-family: var(--font-sans); font-size: 0.84rem;
+  transition: border-color 0.15s;
+}
+.search:focus { outline: none; border-color: var(--accent); }
+.search::placeholder { color: var(--text-faint); }
+.search-wrap::before {
+  content: ''; position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  width: 12px; height: 12px;
+  border: 1.5px solid var(--text-faint); border-radius: 50%;
+}
+.search-wrap::after {
+  content: ''; position: absolute; left: 19px; top: 17px;
+  width: 6px; height: 1.5px; background: var(--text-faint); transform: rotate(45deg);
+}
+.search-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--text-faint); cursor: pointer;
+  font-size: 0.9rem; padding: 2px 6px; border-radius: 3px; display: none;
+}
+.search-clear:hover { color: var(--text); background: var(--surface-2); }
+.search-clear.visible { display: block; }
+
+/* Sidebar TOC */
+.toc { list-style: none; margin: 0; padding: 0; flex: 1; }
+.toc li { margin: 0; }
+.toc a {
+  display: block; padding: 6px 10px; border-radius: 4px;
+  color: var(--text-muted); font-size: 0.82rem; font-family: var(--font-sans);
+  border-left: 2px solid transparent; transition: all 0.12s;
+  line-height: 1.35;
+}
+.toc a:hover { color: var(--text); background: var(--surface); text-decoration: none; border-left-color: var(--border-strong); }
+.toc a.active { color: var(--accent); border-left-color: var(--accent); background: var(--surface); font-weight: 500; }
+.toc a .toc-num { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-faint); margin-right: 6px; }
+.toc a.active .toc-num { color: var(--accent-dim); }
+
+/* Sidebar controls */
+.sidebar-controls { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ctrl-btn {
+  flex: 1; padding: 8px 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+  color: var(--text-muted); font-family: var(--font-sans); font-size: 0.76rem;
+  cursor: pointer; transition: all 0.15s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.ctrl-btn:hover { color: var(--text); border-color: var(--border-strong); background: var(--surface-2); }
+.ctrl-btn .icon { font-family: var(--font-mono); font-size: 0.9rem; }
+
+/* Theme toggle */
+.theme-toggle {
+  padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+  color: var(--text-muted); cursor: pointer; font-family: var(--font-sans); font-size: 0.76rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all 0.15s;
+}
+.theme-toggle:hover { color: var(--accent); border-color: var(--accent-dim); }
+.theme-toggle .icon { font-size: 0.95rem; }
+
+/* Main content area */
+.main { min-width: 0; padding: 0 40px 80px; max-width: calc(var(--max) - var(--sidebar-w)); }
+@media (max-width: 1100px) { .main { padding: 0 32px 80px; } }
+@media (max-width: 720px) { .main { padding: 0 20px 60px; } }
+
+/* Scroll progress bar */
+.progress {
+  position: fixed; top: 0; left: var(--sidebar-w); right: 0; height: 2px;
+  background: transparent; z-index: 100; pointer-events: none;
+}
+.progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.05s linear; }
+@media (max-width: 900px) { .progress { left: 0; } }
+
+/* Header spacing */
+header.wrap { padding-top: 40px; padding-bottom: 24px; padding-left: 0; padding-right: 0; max-width: none; }
+@media (max-width: 720px) { header.wrap { padding-top: 28px; } }
+
+/* Filtered-out rows */
+tbody tr.hidden-row { display: none; }
+.no-results { padding: 16px 20px; color: var(--text-faint); font-style: italic; text-align: center; display: none; }
+.no-results.visible { display: block; }
+
+/* Mobile sidebar toggle */
+.mobile-toggle {
+  display: none; position: fixed; bottom: 20px; right: 20px; z-index: 200;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--accent); color: var(--bg); border: none;
+  font-size: 1.4rem; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  align-items: center; justify-content: center;
+}
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; width: 280px; z-index: 150;
+    transform: translateX(-100%); transition: transform 0.25s ease-out;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .mobile-toggle { display: flex; }
+  .progress { left: 0; }
+  .main { padding: 0 20px 80px; }
+  header.wrap { padding-left: 20px; padding-right: 20px; }
+}
+.sidebar-backdrop {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 140;
+}
+.sidebar-backdrop.visible { display: block; }
+
+/* Footer */
+.footer { border-top: 1px solid var(--border); margin-top: 4rem; padding: 32px 40px 48px; background: var(--bg-elev); }
+.footer-inner { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 0.82rem; color: var(--text-faint); }
+.footer-inner a { color: var(--text-muted); }
+.footer-inner a:hover { color: var(--accent); }
+.footer-meta { font-family: var(--font-mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.back-top { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-family: var(--font-mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; background: none; border: none; }
+.back-top:hover { text-decoration: underline; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+<button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation">&#9776;</button>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">Nabdh<span>.</span>Roadmap<small>Backend v1.4</small></div>
+    <div class="search-wrap">
+      <input type="text" class="search" id="search" placeholder="Filter modules, sprints, risks..." aria-label="Search roadmap">
+      <button class="search-clear" id="searchClear" aria-label="Clear search">&times;</button>
+    </div>
+    <ul class="toc" id="toc">
+      <li><a href="#executive-summary"><span class="toc-num">1</span>Executive Summary</a></li>
+      <li><a href="#status"><span class="toc-num">2</span>Status Assessment</a></li>
+      <li><a href="#roadmap"><span class="toc-num">3</span>Roadmap</a></li>
+      <li><a href="#modules"><span class="toc-num">4</span>Modules</a></li>
+      <li><a href="#sprints"><span class="toc-num">5</span>Sprints</a></li>
+      <li><a href="#team"><span class="toc-num">6</span>Team</a></li>
+      <li><a href="#risks"><span class="toc-num">7</span>Risks</a></li>
+      <li><a href="#dod"><span class="toc-num">8</span>Definition of Done</a></li>
+      <li><a href="#infra"><span class="toc-num">9</span>Infrastructure</a></li>
+      <li><a href="#scope"><span class="toc-num">10</span>Out of Scope</a></li>
+      <li><a href="#api-surface"><span class="toc-num">11</span>API Surface</a></li>
+      <li><a href="#diagrams"><span class="toc-num">12</span>Diagrams</a></li>
+      <li><a href="#references"><span class="toc-num">13</span>References</a></li>
+    </ul>
+    <div class="sidebar-controls">
+      <button class="ctrl-btn" id="expandAll"><span class="icon">+</span>Expand</button>
+      <button class="ctrl-btn" id="collapseAll"><span class="icon">&minus;</span>Collapse</button>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"><span class="icon" id="themeIcon">&#9789;</span></button>
+    </div>
+  </aside>
+  <main class="main">
+
+<section id="executive-summary" class="wrap">
+  <h2>1. Executive Summary</h2>
+
+  <p>The Nabdh backend is a NestJS modular monolith split into 9 domain modules. As of this assessment:</p>
+
+  <ul>
+    <li><strong>Auth module is production-ready</strong> with 55 passing tests (36 unit + 19 e2e), OTP registration, JWT access/refresh with SHA-256 rotation, admin email + TOTP 2FA, and a Twilio SMS provider wired behind a feature flag.</li>
+    <li><strong>Events outbox is implemented</strong> (cron-based poller at 10s intervals, retry tracking, idempotency keys).</li>
+    <li><strong>Health checks, global filters, Request-ID middleware, Joi config validation, ThrottlerModule, and RBAC guards are in place.</strong></li>
+    <li><strong>8 of 9 business modules are scaffolded only</strong>: schemas + DTOs + module shells exist, but controllers and services return mock data. No real CRUD, no geospatial queries, no Socket.IO auth, no FCM, no payment processing, no audit log capture.</li>
+    <li><strong>Interceptors directory is empty.</strong> No file-upload module. No monitoring/observability. No CI workflow.</li>
+  </ul>
+
+  <p>The roadmap below is organized as <strong>MVP, Production, Scale</strong>, decomposed into 9 two-week sprints. The MVP (Sprints 1 to 5) delivers the end-to-end booking flow: registration, request, nurse matching, offers, visit lifecycle, cash payment, rating. Production (Sprints 6 to 8) adds online payments, admin portal, analytics, and hardening. Scale (Sprint 9+) adds observability, performance work, and CI/CD.</p>
+
+  <div class="callout warn">
+    <div class="callout-title">Critical path</div>
+    <p style="margin:0;">Users, Location, Booking, Notifications, Payment. Chat runs in parallel once Booking lands. Admin and Analytics depend on all of the above.</p>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">Out of BRD v1.4 scope (explicitly noted so scope creep is blocked)</div>
+    <p style="margin:0;">Donations system, AI features, Content Management beyond the service catalog. These are listed in Section 10 as future considerations and require PM sign-off before addition.</p>
+  </div>
+</section>
+
+<section id="status" class="wrap">
+  <h2>2. Current Status Assessment</h2>
+
+  <h3 id="status-matrix">2.1 Module Status Matrix</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Module</th>
+          <th>Code Files</th>
+          <th>Schemas</th>
+          <th>Real CRUD</th>
+          <th>Tests</th>
+          <th>Status</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>auth</strong></td>
+          <td>22</td>
+          <td>2 (User, OtpSession, RefreshToken)</td>
+          <td>Full</td>
+          <td>55 pass</td>
+          <td><span class="pill pill-done">COMPLETE</span></td>
+          <td>OTP, JWT, 2FA, Twilio, refresh rotation</td>
+        </tr>
+        <tr>
+          <td><strong>users</strong></td>
+          <td>6</td>
+          <td>5 (User, Patient, Nurse, Address, NurseDocument)</td>
+          <td>Partial (findById/findByPhone real; profile methods stub)</td>
+          <td>0</td>
+          <td><span class="pill pill-partial">PARTIAL</span></td>
+          <td>Controller routes unauthenticated, service returns mocks</td>
+        </tr>
+        <tr>
+          <td><strong>booking</strong></td>
+          <td>5</td>
+          <td>4 (ServiceRequest, Offer, Booking, Rating)</td>
+          <td>None</td>
+          <td>0</td>
+          <td><span class="pill pill-stub">SCAFFOLD</span></td>
+          <td>Emits <code>request.created</code> but with mock IDs</td>
+        </tr>
+        <tr>
+          <td><strong>payment</strong></td>
+          <td>5</td>
+          <td>3 (Payment, Wallet, WalletTransaction)</td>
+          <td>None</td>
+          <td>0</td>
+          <td><span class="pill pill-stub">SCAFFOLD</span></td>
+          <td>Webhook endpoints exist, all <code>@Public()</code></td>
+        </tr>
+        <tr>
+          <td><strong>location</strong></td>
+          <td>4</td>
+          <td>1 (LocationHistory)</td>
+          <td>None</td>
+          <td>0</td>
+          <td><span class="pill pill-stub">SCAFFOLD</span></td>
+          <td>No <code>$geoNear</code> implementation</td>
+        </tr>
+        <tr>
+          <td><strong>chat</strong></td>
+          <td>3</td>
+          <td>1 (ChatMessage)</td>
+          <td>None</td>
+          <td>0</td>
+          <td><span class="pill pill-stub">SCAFFOLD</span></td>
+          <td>Socket.IO gateway skeleton, no persistence, no socket auth</td>
+        </tr>
+        <tr>
+          <td><strong>notifications</strong></td>
+          <td>5</td>
+          <td>1 (Notification)</td>
+          <td>None</td>
+          <td>0</td>
+          <td><span class="pill pill-stub">SCAFFOLD</span></td>
+          <td><code>@OnEvent</code> handlers log only; no FCM; no persistence</td>
+        </tr>
+        <tr>
+          <td><strong>admin</strong></td>
+          <td>5</td>
+          <td>2 (AuditLog, Service)</td>
+          <td>None</td>
+          <td>0</td>
+          <td><span class="pill pill-stub">SCAFFOLD</span></td>
+          <td>All endpoints <code>@Public()</code>; audit log schema exists, not wired</td>
+        </tr>
+        <tr>
+          <td><strong>analytics</strong></td>
+          <td>3</td>
+          <td>0</td>
+          <td>None</td>
+          <td>0</td>
+          <td><span class="pill pill-empty">EMPTY</span></td>
+          <td>No schemas; service returns hardcoded numbers</td>
+        </tr>
+        <tr>
+          <td><strong>events (outbox)</strong></td>
+          <td>4</td>
+          <td>1 (OutboxEvent)</td>
+          <td>Processor working</td>
+          <td>0</td>
+          <td><span class="pill pill-done">IMPLEMENTED</span></td>
+          <td>Cron @ 10s, retry/error tracking, idempotency keys</td>
+        </tr>
+        <tr>
+          <td><strong>health</strong></td>
+          <td>3</td>
+          <td>0</td>
+          <td>Yes</td>
+          <td>0</td>
+          <td><span class="pill pill-done">IMPLEMENTED</span></td>
+          <td><code>/health</code> + <code>/health/ready</code> with DB ping</td>
+        </tr>
+        <tr>
+          <td><strong>upload</strong></td>
+          <td>0</td>
+          <td>0</td>
+          <td>No</td>
+          <td>0</td>
+          <td><span class="pill pill-missing">MISSING</span></td>
+          <td>No MinIO integration despite env vars in <code>validation.ts</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="status-infra">2.2 Cross-Cutting Infrastructure</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th>Status</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AllExceptionsFilter</td>
+          <td><span class="pill pill-done">Implemented</span></td>
+          <td>Mongoose error mapping, Arabic messages</td>
+        </tr>
+        <tr>
+          <td>RequestIdMiddleware</td>
+          <td><span class="pill pill-done">Implemented</span></td>
+          <td>All routes</td>
+        </tr>
+        <tr>
+          <td>JwtAuthGuard (global)</td>
+          <td><span class="pill pill-done">Implemented</span></td>
+          <td><code>@Public()</code> opt-out used pervasively on stubs</td>
+        </tr>
+        <tr>
+          <td>RolesGuard (global)</td>
+          <td><span class="pill pill-done">Implemented</span></td>
+          <td><code>@Roles()</code> decorator available</td>
+        </tr>
+        <tr>
+          <td>ThrottlerModule</td>
+          <td><span class="pill pill-done">Implemented</span></td>
+          <td>100 req / 60s global</td>
+        </tr>
+        <tr>
+          <td>Config validation (Joi)</td>
+          <td><span class="pill pill-done">Implemented</span></td>
+          <td>All env vars documented</td>
+        </tr>
+        <tr>
+          <td>DatabaseModule</td>
+          <td><span class="pill pill-done">Implemented</span></td>
+          <td>Mongoose connection</td>
+        </tr>
+        <tr>
+          <td>AuditLog capture</td>
+          <td><span class="pill pill-missing">Missing</span></td>
+          <td>Schema exists, no middleware/interceptor writes to it</td>
+        </tr>
+        <tr>
+          <td>File upload (MinIO)</td>
+          <td><span class="pill pill-missing">Missing</span></td>
+          <td>Env vars exist (<code>S3_*</code>), no module</td>
+        </tr>
+        <tr>
+          <td>Interceptors</td>
+          <td><span class="pill pill-empty">Empty</span></td>
+          <td><code>common/interceptors/</code> directory empty</td>
+        </tr>
+        <tr>
+          <td>Logging (Winston)</td>
+          <td><span class="pill pill-stub">Dependency only</span></td>
+          <td><code>winston</code> in package.json, no logger module</td>
+        </tr>
+        <tr>
+          <td>Swagger docs</td>
+          <td><span class="pill pill-partial">Partial</span></td>
+          <td>Decorators on stubs; no API versioning</td>
+        </tr>
+        <tr>
+          <td>CI/CD</td>
+          <td><span class="pill pill-missing">Missing</span></td>
+          <td>No GitHub Actions workflow</td>
+        </tr>
+        <tr>
+          <td>Docker</td>
+          <td><span class="pill pill-done">Implemented</span></td>
+          <td>Multi-stage Dockerfile + compose (mongo, minio, api)</td>
+        </tr>
+        <tr>
+          <td>Monitoring</td>
+          <td><span class="pill pill-missing">Missing</span></td>
+          <td>No Prometheus, no metrics endpoint</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="status-debt">2.3 Technical Debt Register</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Debt</th>
+          <th>Impact</th>
+          <th>Fix Window</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>TD-1</code></td>
+          <td>All non-auth controllers use <code>@Public()</code></td>
+          <td>Security: stubs accept unauthenticated calls</td>
+          <td>Sprint 1 (replaced as endpoints go live)</td>
+        </tr>
+        <tr>
+          <td><code>TD-2</code></td>
+          <td><code>users.service.createPatientProfile</code> returns mock object</td>
+          <td>Blocks all downstream flows</td>
+          <td>Sprint 1</td>
+        </tr>
+        <tr>
+          <td><code>TD-3</code></td>
+          <td>No audit log writes despite schema</td>
+          <td>Compliance gap</td>
+          <td>Sprint 6</td>
+        </tr>
+        <tr>
+          <td><code>TD-4</code></td>
+          <td>Socket.IO gateway has no auth</td>
+          <td>Chat/notifications unsecured</td>
+          <td>Sprint 4</td>
+        </tr>
+        <tr>
+          <td><code>TD-5</code></td>
+          <td><code>booking.service</code> emits events with mock IDs</td>
+          <td>Event consumers get bad data</td>
+          <td>Sprint 2</td>
+        </tr>
+        <tr>
+          <td><code>TD-6</code></td>
+          <td>No MongoDB transactions implemented</td>
+          <td>Wallet/ledger operations unsafe</td>
+          <td>Sprint 5</td>
+        </tr>
+        <tr>
+          <td><code>TD-7</code></td>
+          <td><code>ChatMessage</code> has no TTL index</td>
+          <td>Chat history grows unbounded</td>
+          <td>Sprint 4</td>
+        </tr>
+        <tr>
+          <td><code>TD-8</code></td>
+          <td>Interceptors directory empty</td>
+          <td>No logging/caching/transform layer</td>
+          <td>Sprint 6</td>
+        </tr>
+        <tr>
+          <td><code>TD-9</code></td>
+          <td>No CI workflow</td>
+          <td>Untested merges possible</td>
+          <td>Sprint 8</td>
+        </tr>
+        <tr>
+          <td><code>TD-10</code></td>
+          <td><code>analytics</code> has no schemas</td>
+          <td>Module cannot function</td>
+          <td>Sprint 7</td>
+        </tr>
+        <tr>
+          <td><code>TD-11</code></td>
+          <td>Throttle removed from auth controller</td>
+          <td>Auth endpoints rely on global limiter only</td>
+          <td>Sprint 8</td>
+        </tr>
+        <tr>
+          <td><code>TD-12</code></td>
+          <td><code>FCM_SERVER_KEY</code> env var defined but unused</td>
+          <td>No push notifications</td>
+          <td>Sprint 3</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="roadmap">
+  <h2>3. Backend Development Roadmap (Ordered by Priority)</h2>
+
+  <p class="lead">Critical path: <code>Users</code> &rarr; <code>Location</code> &rarr; <code>Booking</code> &rarr; <code>Notifications</code> &rarr; <code>Payment</code>. Chat runs in parallel once Booking lands. Admin and Analytics depend on all of the above.</p>
+
+  <div class="phase">
+    <span class="phase-tag">Phase A</span>
+    <span class="phase-title">MVP (Sprints 1-5)</span>
+    <span class="phase-sub">End-to-end patient &rarr; nurse &rarr; visit &rarr; cash payment flow live in staging.</span>
+  </div>
+
+  <div class="phase">
+    <span class="phase-tag">Phase B</span>
+    <span class="phase-title">Production Release (Sprints 6-8)</span>
+    <span class="phase-sub">Online payments, admin portal, analytics, hardening, CI/CD.</span>
+  </div>
+
+  <div class="phase">
+    <span class="phase-tag">Phase C</span>
+    <span class="phase-title">Scale &amp; Optimization (Sprint 9+)</span>
+    <span class="phase-sub">Observability, performance tuning, sharding prep, security audit.</span>
+  </div>
+
+  <h3>3.1 Priority-Ordered Module Backlog</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Priority</th>
+          <th>Phase</th>
+          <th>Module</th>
+          <th>Business Priority</th>
+          <th>Dependencies</th>
+          <th>Complexity</th>
+          <th>Suggested Owner</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td>MVP</td>
+          <td>users - real CRUD</td>
+          <td>Critical</td>
+          <td>auth (done)</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>BE-1</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td>MVP</td>
+          <td>upload - MinIO integration</td>
+          <td>Critical</td>
+          <td>none</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>BE-2</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td>MVP</td>
+          <td>location - $geoNear + GPS</td>
+          <td>Critical</td>
+          <td>users</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>BE-2</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td>MVP</td>
+          <td>booking - request + offers + lifecycle</td>
+          <td>Critical</td>
+          <td>users, location</td>
+          <td><span class="cx cx-high">High</span></td>
+          <td>BE-1</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td>MVP</td>
+          <td>booking - SOS dispatch</td>
+          <td>Critical</td>
+          <td>booking core</td>
+          <td><span class="cx cx-high">High</span></td>
+          <td>BE-1</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p0">P0</span></td>
+          <td>MVP</td>
+          <td>notifications - Socket emit + FCM</td>
+          <td>High</td>
+          <td>events outbox (done)</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>BE-3</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p1">P1</span></td>
+          <td>MVP</td>
+          <td>chat - real-time messaging</td>
+          <td>High</td>
+          <td>booking, Socket auth</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>BE-3</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p1">P1</span></td>
+          <td>MVP</td>
+          <td>payment - cash + wallet + commission</td>
+          <td>High</td>
+          <td>booking</td>
+          <td><span class="cx cx-high">High</span></td>
+          <td>BE-2</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p2">P2</span></td>
+          <td>Prod</td>
+          <td>admin - dashboard + verification + disputes</td>
+          <td>High</td>
+          <td>users, booking, payment</td>
+          <td><span class="cx cx-high">High</span></td>
+          <td>BE-1</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p2">P2</span></td>
+          <td>Prod</td>
+          <td>audit log - interceptor + capture</td>
+          <td>High</td>
+          <td>none</td>
+          <td><span class="cx cx-low">Low</span></td>
+          <td>BE-3</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p2">P2</span></td>
+          <td>Prod</td>
+          <td>analytics - schemas + aggregation</td>
+          <td>Medium</td>
+          <td>booking, payment</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>BE-3</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p2">P2</span></td>
+          <td>Prod</td>
+          <td>payment - Paymob + Fawry webhooks</td>
+          <td>High</td>
+          <td>payment core</td>
+          <td><span class="cx cx-high">High</span></td>
+          <td>BE-2</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p2">P2</span></td>
+          <td>Prod</td>
+          <td>booking - scheduled + ratings</td>
+          <td>Medium</td>
+          <td>booking core</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>BE-1</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p3">P3</span></td>
+          <td>Prod</td>
+          <td>security hardening + CI</td>
+          <td>High</td>
+          <td>all</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>BE-3 / DevOps</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p3">P3</span></td>
+          <td>Scale</td>
+          <td>observability (Prometheus, Winston)</td>
+          <td>Medium</td>
+          <td>none</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>DevOps</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p3">P3</span></td>
+          <td>Scale</td>
+          <td>performance (indexes, query profiling)</td>
+          <td>Medium</td>
+          <td>none</td>
+          <td><span class="cx cx-med">Medium</span></td>
+          <td>BE-1</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p3">P3</span></td>
+          <td>Scale</td>
+          <td>API versioning + OpenAPI publish</td>
+          <td>Low</td>
+          <td>none</td>
+          <td><span class="cx cx-low">Low</span></td>
+          <td>BE-3</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Dependency Graph</h3>
+  <div class="graph">
+<pre>[auth] done ──► [users] ──► [upload]
+                   │
+                   ▼
+               [location]
+                   │
+                   ▼
+          [booking core] ──► [SOS dispatch]
+                   │
+       ┌───────────┼───────────┐
+       ▼           ▼           ▼
+    [chat]    [payment]   [scheduled + ratings]
+       │      │     │
+       │      │     └─► [Paymob + Fawry]
+       │      │
+       │      └─► [analytics]
+       │
+       ▼
+    [admin] ──► [audit log] (independent)
+
+[events outbox] done ──► [notifications]
+                            (FCM + socket emit)</pre>
+  </div>
+</section>
+
+<section id="modules">
+  <h2>4. Per-Module Detail</h2>
+
+  <div class="module">
+    <h3>4.1 Authentication &amp; Authorization (auth) <span class="pill pill-done">COMPLETE</span></h3>
+    <dl>
+      <dt>Objective</dt>
+      <dd>OTP registration for patients/nurses, email+password+TOTP for admins, JWT access 15m / refresh 7d with SHA-256 rotation.</dd>
+      <dt>Required APIs</dt>
+      <dd>
+        <ul>
+          <li><code>POST /auth/otp/send</code></li>
+          <li><code>POST /auth/otp/verify</code></li>
+          <li><code>POST /auth/refresh</code></li>
+          <li><code>POST /auth/logout</code></li>
+          <li><code>POST /admin/auth/login</code></li>
+          <li><code>POST /admin/auth/2fa/verify</code></li>
+          <li><code>POST /admin/auth/2fa/setup</code></li>
+          <li><code>POST /admin/auth/2fa/activate</code></li>
+        </ul>
+        <p><em>all implemented.</em></p>
+      </dd>
+      <dt>Database entities</dt>
+      <dd><code>users</code>, <code>otp_sessions</code> (TTL), <code>refresh_tokens</code></dd>
+      <dt>External services</dt>
+      <dd>Twilio (SMS), otplib (TOTP), bcryptjs, qrcode</dd>
+      <dt>Security</dt>
+      <dd>JWT bearer, refresh token ownership check on logout, TOTP 2FA for admins, global JwtAuthGuard + RolesGuard</dd>
+      <dt>Testing</dt>
+      <dd>36 unit + 19 e2e = 55 tests. Coverage sufficient.</dd>
+      <dt>Remaining work</dt>
+      <dd>Add per-endpoint rate limiting (Sprint 8). Replace dev JWT secret in production (ops).</dd>
+    </dl>
+  </div>
+
+  <div class="module">
+    <h3>4.2 User Management (users) <span class="pill pill-partial">PARTIAL</span></h3>
+    <dl>
+      <dt>Objective</dt>
+      <dd>Patient + nurse profile CRUD, nurse document upload, address book, nurse availability toggle, admin verification workflow entry point.</dd>
+      <dt>Required APIs</dt>
+      <dd>
+        <ul>
+          <li><code>POST /patient/profile</code></li>
+          <li><code>GET /patient/profile</code></li>
+          <li><code>PUT /patient/profile</code></li>
+          <li><code>POST /patient/addresses</code></li>
+          <li><code>GET /patient/addresses</code></li>
+          <li><code>DELETE /patient/addresses/:id</code></li>
+          <li><code>POST /nurse/profile</code></li>
+          <li><code>GET /nurse/profile</code></li>
+          <li><code>PUT /nurse/profile</code></li>
+          <li><code>POST /nurse/documents</code></li>
+          <li><code>GET /nurse/documents</code></li>
+          <li><code>DELETE /nurse/documents/:id</code></li>
+          <li><code>PATCH /nurse/availability</code></li>
+          <li><code>GET /nurses/:id</code> (public profile for patient)</li>
+        </ul>
+      </dd>
+      <dt>Database entities</dt>
+      <dd><code>users</code>, <code>patients</code>, <code>nurses</code>, <code>addresses</code>, <code>nurse_documents</code></dd>
+      <dt>External services</dt>
+      <dd>MinIO/S3 (file storage for documents + photos)</dd>
+      <dt>Security</dt>
+      <dd>JwtAuthGuard; patients access own profile only; nurses access own profile only; admin can list/verify any; document URLs are signed and time-limited.</dd>
+      <dt>Testing</dt>
+      <dd>Unit tests for service (mock model), e2e for controller with mongodb-memory-server. Target &ge;80% coverage.</dd>
+      <dt>Remaining work</dt>
+      <dd>Replace 3 stub methods with real Mongoose operations; add 11 missing endpoints; integrate upload module; add role-based route guards.</dd>
+    </dl>
+  </div>
+
+  <div class="module">
+    <h3>4.3 Location (location) <span class="pill pill-stub">SCAFFOLD</span></h3>
+    <dl>
+      <dt>Objective</dt>
+      <dd>Nurse GPS updates, nearby-nurse search via <code>$geoNear</code>, ETA calculation, location history trail with 7-day TTL.</dd>
+      <dt>Required APIs</dt>
+      <dd>
+        <ul>
+          <li><code>POST /nurse/location</code> (auth: nurse only)</li>
+          <li><code>GET /nurses/nearby?lat&amp;lng&amp;radiusKm&amp;genderPref</code> (auth: patient)</li>
+          <li><code>GET /nurse/location-history/:nurseId</code> (auth: admin or self)</li>
+        </ul>
+      </dd>
+      <dt>Database entities</dt>
+      <dd><code>nurses.location</code> (2dsphere), <code>location_history</code> (2dsphere + TTL)</dd>
+      <dt>External services</dt>
+      <dd>OSRM or Mapbox Directions for ETA</dd>
+      <dt>Security</dt>
+      <dd>Only nurse updates own location; patients query nearby without exposing nurse PII (return only id + distance + rating).</dd>
+      <dt>Testing</dt>
+      <dd>Unit: $geoNear query construction. E2E: insert nurses at known coords, assert sorted-by-distance results.</dd>
+      <dt>Remaining work</dt>
+      <dd>Implement <code>updateLocation</code> (upsert nurse.location + push to location_history); implement <code>findNearbyNurses</code> with <code>$geoNear</code> aggregation; add ETA helper.</dd>
+    </dl>
+  </div>
+
+  <div class="module">
+    <h3>4.4 Booking &amp; Case Management (booking) <span class="pill pill-stub">SCAFFOLD</span></h3>
+    <dl>
+      <dt>Objective</dt>
+      <dd>Patient creates service request &rarr; matching algorithm surfaces to nearby nurses &rarr; nurses submit offers &rarr; patient selects &rarr; lifecycle transitions (PENDING_OFFERS &rarr; ... &rarr; CLOSED) &rarr; cancellation &rarr; SOS dispatch &rarr; scheduled bookings &rarr; ratings.</dd>
+      <dt>Required APIs</dt>
+      <dd>
+        <ul>
+          <li><code>POST /requests</code> (patient)</li>
+          <li><code>GET /requests/:id</code></li>
+          <li><code>GET /requests</code> (patient: own)</li>
+          <li><code>GET /requests/available</code> (nurse: matching)</li>
+          <li><code>POST /offers</code> (nurse)</li>
+          <li><code>GET /offers/:requestId</code></li>
+          <li><code>POST /offers/:id/accept</code> (patient)</li>
+          <li><code>POST /bookings/:id/status</code> (nurse: advance lifecycle)</li>
+          <li><code>POST /bookings/:id/cancel</code></li>
+          <li><code>POST /requests/sos</code></li>
+          <li><code>POST /requests/scheduled</code></li>
+          <li><code>POST /bookings/:id/rate</code> (patient)</li>
+          <li><code>GET /bookings/:id</code></li>
+          <li><code>GET /bookings</code> (patient or nurse: own history)</li>
+        </ul>
+      </dd>
+      <dt>Database entities</dt>
+      <dd><code>service_requests</code>, <code>offers</code>, <code>bookings</code>, <code>ratings</code>, <code>services</code> (admin module)</dd>
+      <dt>External services</dt>
+      <dd>events outbox (done), location service for matching, notifications service for fan-out</dd>
+      <dt>Security</dt>
+      <dd>Patient owns request; nurse sees only matched requests; atomic status transitions via <code>findOneAndUpdate</code> with status precondition; no double-booking (compound unique on <code>offers {requestId, nurseId}</code>); SOS uses first-accept-wins with atomic <code>findOneAndUpdate</code>.</dd>
+      <dt>Testing</dt>
+      <dd>Unit: state machine transitions (legal/illegal moves), matching algorithm, SOS atomic accept. E2e: full request &rarr; offer &rarr; accept &rarr; complete flow.</dd>
+      <dt>Remaining work</dt>
+      <dd>Everything except schema. Largest module.</dd>
+    </dl>
+  </div>
+
+  <div class="module">
+    <h3>4.5 SOS / Emergency Requests <span class="pill pill-stub">SCAFFOLD</span></h3>
+    <p><em>subset of booking</em></p>
+    <dl>
+      <dt>Objective</dt>
+      <dd>First-accept-wins dispatch with 1.5&times; market avg pricing, 2-min timeout, 20&rarr;30km radius expansion, free-text description (no service catalog).</dd>
+      <dt>Required APIs</dt>
+      <dd>
+        <ul>
+          <li><code>POST /requests/sos</code></li>
+          <li><code>POST /requests/sos/:id/accept</code> (nurse, atomic)</li>
+        </ul>
+      </dd>
+      <dt>Database entities</dt>
+      <dd><code>service_requests</code> (type=SOS, sosDescription)</dd>
+      <dt>External services</dt>
+      <dd>notifications (broadcast to all nearby nurses), location (radius expansion)</dd>
+      <dt>Security</dt>
+      <dd>Atomic accept via <code>findOneAndUpdate({ _id, status: PENDING_OFFERS }, { status: NURSE_CONFIRMED })</code>; only first call succeeds.</dd>
+      <dt>Testing</dt>
+      <dd>Unit: concurrent accept race condition (10 simultaneous accepts &rarr; exactly 1 winner).</dd>
+      <dt>Remaining work</dt>
+      <dd>Implement in booking service (Sprint 2).</dd>
+    </dl>
+  </div>
+
+  <div class="module">
+    <h3>4.6 Payment &amp; Wallet (payment) <span class="pill pill-stub">SCAFFOLD</span></h3>
+    <dl>
+      <dt>Objective</dt>
+      <dd>Nurse wallet with prepaid balance (EGP 100 min for cash visits), commission capture on visit completion, Paymob card integration, Fawry reference integration, wallet ledger with double-entry integrity, withdrawals.</dd>
+      <dt>Required APIs</dt>
+      <dd>
+        <ul>
+          <li><code>GET /nurse/wallet</code></li>
+          <li><code>GET /nurse/wallet/transactions</code></li>
+          <li><code>POST /nurse/wallet/withdraw</code></li>
+          <li><code>POST /payments/cash/confirm</code> (nurse confirms cash collected on visit complete)</li>
+          <li><code>POST /webhooks/paymob</code></li>
+          <li><code>POST /webhooks/fawry</code></li>
+          <li><code>POST /admin/wallets/:nurseId/adjust</code> (admin)</li>
+        </ul>
+      </dd>
+      <dt>Database entities</dt>
+      <dd><code>payments</code>, <code>wallets</code>, <code>wallet_transactions</code> (ledger)</dd>
+      <dt>External services</dt>
+      <dd>Paymob API (cards), Fawry API (cash reference), MongoDB multi-document transactions for ledger</dd>
+      <dt>Security</dt>
+      <dd>Webhook signature verification (HMAC); admin-only wallet adjustments; atomic ledger via <code>session.startTransaction()</code>.</dd>
+      <dt>Testing</dt>
+      <dd>Unit: ledger balance invariant (sum of transactions == wallet balance); webhook signature validation. E2e: booking complete &rarr; commission deducted &rarr; nurse balance updated.</dd>
+      <dt>Remaining work</dt>
+      <dd>Cash + wallet + commission in Sprint 5 (MVP); Paymob/Fawry in Sprint 7 (Production).</dd>
+    </dl>
+  </div>
+
+  <div class="module">
+    <h3>4.7 Chat (chat) <span class="pill pill-stub">SCAFFOLD</span></h3>
+    <dl>
+      <dt>Objective</dt>
+      <dd>Per-booking real-time messaging between patient and assigned nurse. Message persistence, delivery + read receipts, history retrieval.</dd>
+      <dt>Required APIs</dt>
+      <dd>
+        <p><strong>WebSocket:</strong></p>
+        <ul>
+          <li><code>message:send</code></li>
+          <li><code>message:read</code></li>
+          <li><code>join:room</code></li>
+        </ul>
+        <p><strong>REST:</strong></p>
+        <ul>
+          <li><code>GET /bookings/:id/messages?before&amp;limit</code> (paginated history)</li>
+        </ul>
+      </dd>
+      <dt>Database entities</dt>
+      <dd><code>chat_messages</code></dd>
+      <dt>External services</dt>
+      <dd>Socket.IO (already in deps), Redis adapter optional at scale (not in MVP)</dd>
+      <dt>Security</dt>
+      <dd>Socket auth via JWT in handshake; only participants of the booking can join the room; message content length limit; rate limit per socket.</dd>
+      <dt>Testing</dt>
+      <dd>Unit: room authorization (non-participant rejected). E2e: two socket clients, message round-trip, persistence verified in DB.</dd>
+      <dt>Remaining work</dt>
+      <dd>Add JWT auth to gateway, persist messages, add REST history endpoint, read receipts (Sprint 4).</dd>
+    </dl>
+  </div>
+
+  <div class="module">
+    <h3>4.8 Notifications (notifications) <span class="pill pill-stub">SCAFFOLD</span></h3>
+    <dl>
+      <dt>Objective</dt>
+      <dd>In-app notifications list (read/unread), FCM push for Android, Socket.IO real-time emit, event handlers for booking lifecycle.</dd>
+      <dt>Required APIs</dt>
+      <dd>
+        <ul>
+          <li><code>GET /notifications</code></li>
+          <li><code>PATCH /notifications/:id/read</code></li>
+          <li><code>PATCH /notifications/read-all</code></li>
+          <li><code>POST /notifications/fcm-token</code> (register device)</li>
+        </ul>
+      </dd>
+      <dt>Database entities</dt>
+      <dd><code>notifications</code>, plus <code>fcm_tokens</code> (new - needs schema)</dd>
+      <dt>External services</dt>
+      <dd>Firebase Cloud Messaging (FCM), Socket.IO</dd>
+      <dt>Security</dt>
+      <dd>User sees only own notifications; FCM token bound to user ID.</dd>
+      <dt>Testing</dt>
+      <dd>Unit: event handler creates correct notification record. E2e: emit <code>booking.status.changed</code> &rarr; notification persisted + FCM call intercepted.</dd>
+      <dt>Remaining work</dt>
+      <dd>Add <code>FcmToken</code> schema, FCM provider behind feature flag (like Twilio), persist notifications in @OnEvent handlers, REST endpoints, Socket emit (Sprint 3).</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="modules-cont">
+
+  <article class="module">
+    <h3>4.9 Admin Panel APIs (admin) <span class="pill pill-stub">SCAFFOLD</span></h3>
+    <dl>
+      <dt>Objective</dt><dd>Dashboard KPIs, nurse verification queue + approve/reject, user management (list/suspend/ban), booking oversight, dispute handling, service catalog CRUD, commission config (super admin), finance overview.</dd>
+      <dt>Required APIs</dt><dd><code>GET /admin/dashboard</code>, <code>GET /admin/nurses/pending-verification</code>, <code>POST /admin/nurses/:id/verify</code>, <code>POST /admin/nurses/:id/reject</code>, <code>GET /admin/users</code>, <code>PATCH /admin/users/:id/status</code>, <code>GET /admin/bookings</code>, <code>POST /admin/bookings/:id/dispute</code>, <code>POST /admin/services</code>, <code>PUT /admin/services/:id</code>, <code>PATCH /admin/commission/:serviceId</code>, <code>GET /admin/finance/overview</code>, <code>GET /admin/audit-logs</code></dd>
+      <dt>Database entities</dt><dd><code>users</code>, <code>nurses</code>, <code>bookings</code>, <code>services</code>, <code>audit_logs</code></dd>
+      <dt>External services</dt><dd>All other modules via service injection</dd>
+      <dt>Security</dt><dd><code>@Roles(ADMIN)</code> on every route; super-admin role for commission config; all mutations write to <code>audit_logs</code>.</dd>
+      <dt>Testing</dt><dd>Unit: verification SLA calculation. E2e: admin login &rarr; verify nurse &rarr; audit log written.</dd>
+      <dt>Remaining work</dt><dd>Replace stubs, add ~12 endpoints, wire audit log capture (Sprint 6).</dd>
+    </dl>
+  </article>
+
+  <article class="module">
+    <h3>4.10 Analytics &amp; Reporting (analytics) <span class="pill pill-empty">EMPTY</span></h3>
+    <dl>
+      <dt>Objective</dt><dd>Aggregated metrics: revenue (daily/weekly/monthly), booking funnel (created&rarr;completed&rarr;cancelled&rarr;disputed), nurse performance, patient demographics, service type distribution. Exportable reports (CSV).</dd>
+      <dt>Required APIs</dt><dd><code>GET /analytics/revenue?from&amp;to</code>, <code>GET /analytics/bookings?from&amp;to</code>, <code>GET /analytics/nurses/:id/performance</code>, <code>GET /analytics/services/distribution</code>, <code>GET /analytics/export?format=csv</code></dd>
+      <dt>Database entities</dt><dd>Aggregations over <code>bookings</code>, <code>payments</code>, <code>wallet_transactions</code>, <code>users</code>, <code>nurses</code> &mdash; no new persistent schemas required for MVP.</dd>
+      <dt>External services</dt><dd>None</dd>
+      <dt>Security</dt><dd>Admin-only (all endpoints <code>@Roles(ADMIN)</code>).</dd>
+      <dt>Testing</dt><dd>Unit: aggregation pipeline construction. E2e: seed test data, assert computed totals match.</dd>
+      <dt>Remaining work</dt><dd>Build aggregation pipelines, no schemas needed (Sprint 7).</dd>
+    </dl>
+  </article>
+
+  <article class="module">
+    <h3>4.11 Content Management (admin/services) <span class="pill pill-stub">SCAFFOLD</span></h3>
+    <dl>
+      <dt>Objective</dt><dd>Service catalog CRUD (nameAr, descriptionAr, icon, basePriceMin/Max, durationMinutes, commissionRate, isActive). This is the extent of CMS in BRD v1.4.</dd>
+      <dt>Required APIs</dt><dd><code>POST /admin/services</code>, <code>GET /services</code> (public), <code>GET /services/:id</code>, <code>PUT /admin/services/:id</code>, <code>DELETE /admin/services/:id</code> (soft delete via isActive)</dd>
+      <dt>Database entities</dt><dd><code>services</code></dd>
+      <dt>External services</dt><dd>None</dd>
+      <dt>Security</dt><dd>Read public; write admin-only.</dd>
+      <dt>Testing</dt><dd>Unit + e2e.</dd>
+      <dt>Remaining work</dt><dd>Implement CRUD in admin service (Sprint 6).</dd>
+    </dl>
+  </article>
+
+  <article class="module">
+    <h3>4.12 Audit Logs <span class="pill pill-empty">NOT WIRED</span></h3>
+    <dl>
+      <dt>Objective</dt><dd>Capture every admin mutation (verify, suspend, commission change, dispute) with actorId, action, resourceType, resourceId, details, IP.</dd>
+      <dt>Required APIs</dt><dd><code>GET /admin/audit-logs?actor&amp;action&amp;from&amp;to</code> (paginated)</dd>
+      <dt>Database entities</dt><dd><code>audit_logs</code> (schema exists)</dd>
+      <dt>External services</dt><dd>None</dd>
+      <dt>Security</dt><dd>Admin-only read; write via interceptor on admin routes.</dd>
+      <dt>Testing</dt><dd>E2e: admin action &rarr; audit log entry present with correct actorId + IP.</dd>
+      <dt>Remaining work</dt><dd>Add <code>AuditLogInterceptor</code> in <code>common/interceptors/</code>, bind to admin controller (Sprint 6).</dd>
+    </dl>
+  </article>
+
+  <article class="module">
+    <h3>4.13 File Storage (upload) <span class="pill pill-missing">MISSING</span></h3>
+    <dl>
+      <dt>Objective</dt><dd>MinIO/S3 abstraction for nurse document upload, profile photos, service icons. Signed URLs for upload + download.</dd>
+      <dt>Required APIs</dt><dd><code>POST /upload</code> (multipart, returns URL), <code>GET /upload/signed-url?key</code></dd>
+      <dt>Database entities</dt><dd>None (URLs stored on <code>nurse_documents</code>, <code>nurses.photoUrl</code>, <code>services.icon</code>)</dd>
+      <dt>External services</dt><dd>MinIO (dev) / S3 (prod)</dd>
+      <dt>Security</dt><dd>JwtAuthGuard; file type whitelist (pdf, jpg, png); size limit 10MB per document (per <code>seq-nurse-onboarding.puml</code>); signed URLs with 15-min expiry; virus scan optional in Production.</dd>
+      <dt>Testing</dt><dd>Unit: presigned URL generation. E2e: upload file &rarr; fetch via signed URL &rarr; content matches.</dd>
+      <dt>Remaining work</dt><dd>New <code>upload</code> module, <code>UploadService</code> wrapping MinIO SDK, controller with multer (Sprint 1).</dd>
+    </dl>
+  </article>
+
+  <article class="module">
+    <h3>4.14 Monitoring &amp; Observability <span class="pill pill-missing">MISSING</span></h3>
+    <dl>
+      <dt>Objective</dt><dd>Structured logs (Winston), Prometheus metrics endpoint, request latency histogram, DB query slow-log, alerting hooks.</dd>
+      <dt>Required APIs</dt><dd><code>GET /metrics</code> (Prometheus format)</dd>
+      <dt>Database entities</dt><dd>None</dd>
+      <dt>External services</dt><dd>Prometheus + Grafana (ops), Winston logger</dd>
+      <dt>Security</dt><dd><code>/metrics</code> admin-only or internal-only behind ALB.</dd>
+      <dt>Testing</dt><dd>Smoke test: metrics endpoint returns 200 with expected keys.</dd>
+      <dt>Remaining work</dt><dd>Winston logger module, <code>prom-client</code> integration, <code>MetricsInterceptor</code> (Sprint 9).</dd>
+    </dl>
+  </article>
+
+  <article class="module">
+    <h3>4.15 Infrastructure &amp; DevOps <span class="pill pill-partial">PARTIAL</span></h3>
+    <dl>
+      <dt>Done</dt><dd>Dockerfile (multi-stage, non-root), docker-compose.yml (mongo, minio, api), <code>.dockerignore</code>, health endpoints, Joi env validation.</dd>
+      <dt>Remaining</dt><dd>GitHub Actions CI (lint, test, build on PR), Docker Compose healthchecks for all services, <code>.env.example</code> for team distribution, ECS Fargate task definition, MongoDB Atlas connection hardening, AWS Secrets Manager integration, ALB + TLS 1.3.</dd>
+      <dt>Sprint</dt><dd>Sprint 8 (CI), Sprint 9 (prod infra).</dd>
+    </dl>
+  </article>
+
+</section>
+
+<section id="sprints">
+
+  <article class="sprint">
+    <header class="sprint-head">
+      <span class="sprint-num">Sprint 1</span>
+      <span class="sprint-title">Users + Upload + Location</span>
+      <span class="sprint-meta">10 days &middot; BE-1 + BE-2</span>
+    </header>
+    <div class="sprint-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>Owner</th><th>Task</th></tr></thead>
+          <tbody>
+            <tr><td>1&ndash;2</td><td>BE-1</td><td><code>users.service</code>: real <code>createPatientProfile</code>, <code>getPatientProfile</code>, <code>getNurseProfile</code>, <code>updatePatientProfile</code>, <code>updateNurseProfile</code> with Mongoose</td></tr>
+            <tr><td>1&ndash;2</td><td>BE-2</td><td>New <code>upload</code> module: <code>UploadService</code> (MinIO SDK), <code>UploadController</code> with multer, signed URL helper</td></tr>
+            <tr><td>3</td><td>BE-1</td><td>Patient + nurse DTOs (create/update), validation</td></tr>
+            <tr><td>3</td><td>BE-2</td><td>Nurse document endpoints: <code>POST /nurse/documents</code>, <code>GET /nurse/documents</code>, <code>DELETE /nurse/documents/:id</code></td></tr>
+            <tr><td>4</td><td>BE-1</td><td>Address CRUD endpoints + DTOs</td></tr>
+            <tr><td>4</td><td>BE-2</td><td><code>location.service</code>: <code>updateLocation</code> (upsert nurse.location + location_history), <code>findNearbyNurses</code> with <code>$geoNear</code></td></tr>
+            <tr><td>5</td><td>BE-1</td><td>Nurse availability toggle endpoint, public nurse profile endpoint</td></tr>
+            <tr><td>5</td><td>BE-2</td><td>ETA helper (OSRM call)</td></tr>
+            <tr><td>6&ndash;7</td><td>BE-1 + BE-2</td><td>Unit tests for users + upload + location services</td></tr>
+            <tr><td>8</td><td>BE-1 + BE-2</td><td>E2E tests for new endpoints (mongodb-memory-server)</td></tr>
+            <tr><td>9</td><td>BE-1 + BE-2</td><td>Remove <code>@Public()</code> from all users/location endpoints; apply <code>@Roles</code> where needed</td></tr>
+            <tr><td>10</td><td>Both</td><td>Swagger decorators, code review, merge</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sprint-deliverables"><strong>Deliverables:</strong> Real user profiles, document upload, nearby nurse search.</p>
+      <p class="sprint-acceptance">E2E test: patient registers (auth) &rarr; creates profile &rarr; uploads address &rarr; searches nearby nurses &rarr; nurse found with correct distance ordering.</p>
+    </div>
+  </article>
+
+  <article class="sprint">
+    <header class="sprint-head">
+      <span class="sprint-num">Sprint 2</span>
+      <span class="sprint-title">Booking Core + SOS</span>
+      <span class="sprint-meta">10 days &middot; BE-1 + BE-2</span>
+    </header>
+    <div class="sprint-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>Owner</th><th>Task</th></tr></thead>
+          <tbody>
+            <tr><td>1&ndash;2</td><td>BE-1</td><td><code>booking.service</code>: <code>createRequest</code> with real patient lookup, geo point, persistence</td></tr>
+            <tr><td>1&ndash;2</td><td>BE-2</td><td>Matching algorithm: query nearby nurses (location service), filter by gender pref + verification status + availability, rank by distance + rating</td></tr>
+            <tr><td>3</td><td>BE-1</td><td><code>GET /requests/available</code> for nurse view</td></tr>
+            <tr><td>3</td><td>BE-2</td><td><code>POST /offers</code> (nurse submits offer), <code>GET /offers/:requestId</code></td></tr>
+            <tr><td>4</td><td>BE-1</td><td><code>POST /offers/:id/accept</code> (patient selects) &rarr; creates Booking, atomic</td></tr>
+            <tr><td>4</td><td>BE-2</td><td>Lifecycle transitions: <code>POST /bookings/:id/status</code> with state machine validation</td></tr>
+            <tr><td>5</td><td>BE-1</td><td>Cancellation: patient free before NURSE_CONFIRMED, nurse cancel with penalty</td></tr>
+            <tr><td>5</td><td>BE-2</td><td>SOS: <code>POST /requests/sos</code>, atomic first-accept, 1.5&times; pricing calc, 2-min timeout</td></tr>
+            <tr><td>6</td><td>BE-1</td><td>Scheduled bookings: <code>POST /requests/scheduled</code>, 30-min pre-broadcast cron</td></tr>
+            <tr><td>7</td><td>BE-2</td><td>Ratings: <code>POST /bookings/:id/rate</code>, update nurse avgRating + totalRatings</td></tr>
+            <tr><td>8&ndash;9</td><td>Both</td><td>Unit + e2e tests (state machine, SOS race condition, matching)</td></tr>
+            <tr><td>10</td><td>Both</td><td>Wire real event emission to outbox (replace mock IDs)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sprint-deliverables"><strong>Deliverables:</strong> Full booking lifecycle, SOS, scheduled, ratings.</p>
+      <p class="sprint-acceptance">E2E: patient creates request &rarr; nurse sees it &rarr; submits offer &rarr; patient accepts &rarr; nurse advances through lifecycle &rarr; completes &rarr; patient rates &rarr; nurse avgRating updated.</p>
+    </div>
+  </article>
+
+  <article class="sprint">
+    <header class="sprint-head">
+      <span class="sprint-num">Sprint 3</span>
+      <span class="sprint-title">Notifications + FCM</span>
+      <span class="sprint-meta">10 days &middot; BE-3</span>
+    </header>
+    <div class="sprint-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>Task</th></tr></thead>
+          <tbody>
+            <tr><td>1&ndash;2</td><td><code>FcmToken</code> schema; FCM provider behind feature flag (FCM_SERVER_KEY); <code>POST /notifications/fcm-token</code></td></tr>
+            <tr><td>3</td><td><code>notifications.service</code> @OnEvent handlers: persist Notification record on <code>request.created</code>, <code>offer.submitted</code>, <code>booking.status.changed</code>, <code>booking.completed</code></td></tr>
+            <tr><td>4</td><td><code>GET /notifications</code>, <code>PATCH /notifications/:id/read</code>, <code>PATCH /notifications/read-all</code></td></tr>
+            <tr><td>5</td><td>Socket.IO emit helper: push to user's room on notification create</td></tr>
+            <tr><td>6</td><td><code>notifications.gateway</code> with JWT auth on handshake (shared with chat)</td></tr>
+            <tr><td>7&ndash;8</td><td>Unit + e2e tests (event &rarr; notification persisted + FCM mocked + socket emit verified)</td></tr>
+            <tr><td>9</td><td>Wire all booking events to notification fan-out</td></tr>
+            <tr><td>10</td><td>Code review, merge</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sprint-deliverables"><strong>Deliverables:</strong> Real push notifications for all booking events.</p>
+      <p class="sprint-acceptance">E2E: booking status change &rarr; notification in DB &rarr; FCM call intercepted &rarr; socket client in user room receives event.</p>
+    </div>
+  </article>
+
+  <article class="sprint">
+    <header class="sprint-head">
+      <span class="sprint-num">Sprint 4</span>
+      <span class="sprint-title">Chat</span>
+      <span class="sprint-meta">10 days &middot; BE-3, with BE-1 support</span>
+    </header>
+    <div class="sprint-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>Task</th></tr></thead>
+          <tbody>
+            <tr><td>1&ndash;2</td><td><code>chat.gateway</code>: JWT auth in handshake, room = <code>booking:{id}</code>, verify user is booking participant before join</td></tr>
+            <tr><td>3</td><td><code>message:send</code> &rarr; persist <code>ChatMessage</code>, emit <code>message:received</code> to room</td></tr>
+            <tr><td>4</td><td><code>message:read</code> &rarr; update <code>isRead</code>, broadcast read receipt</td></tr>
+            <tr><td>5</td><td>REST: <code>GET /bookings/:id/messages</code> with cursor pagination</td></tr>
+            <tr><td>6</td><td>Delivery receipts, unread count endpoint</td></tr>
+            <tr><td>7</td><td>TTL index on <code>chat_messages</code> (optional, 90-day)</td></tr>
+            <tr><td>8&ndash;9</td><td>Unit + e2e tests (auth, room authz, round-trip, pagination)</td></tr>
+            <tr><td>10</td><td>Code review, merge</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sprint-deliverables"><strong>Deliverables:</strong> Working per-booking chat.</p>
+      <p class="sprint-acceptance">E2E: patient + nurse socket clients connect, exchange 5 messages, all persisted, history endpoint returns them in order, non-participant socket rejected.</p>
+    </div>
+  </article>
+
+  <article class="sprint">
+    <header class="sprint-head">
+      <span class="sprint-num">Sprint 5</span>
+      <span class="sprint-title">Payment: Cash + Wallet + Commission</span>
+      <span class="sprint-meta">10 days &middot; BE-2</span>
+    </header>
+    <div class="sprint-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>Task</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><code>payment.service</code>: create Wallet on nurse verification event (<code>nurse.verified</code>)</td></tr>
+            <tr><td>2</td><td>Wallet CRUD: <code>GET /nurse/wallet</code>, <code>GET /nurse/wallet/transactions</code></td></tr>
+            <tr><td>3</td><td>Commission calc on <code>booking.completed</code>: lookup service commissionRate, compute amount, create Payment record</td></tr>
+            <tr><td>4</td><td>MongoDB transaction: credit nurse <code>availableBalance</code>, debit <code>prepaidBalance</code> (if cash), insert <code>WalletTransaction</code> ledger entries</td></tr>
+            <tr><td>5</td><td>Cash payment: <code>POST /payments/cash/confirm</code> (nurse confirms collection), enforce EGP 100 min prepaid balance</td></tr>
+            <tr><td>6</td><td>SOS pricing: 1.5&times; 30-day average for service type</td></tr>
+            <tr><td>7</td><td>Withdrawal request: <code>POST /nurse/wallet/withdraw</code> (creates DEBT transaction, admin approves)</td></tr>
+            <tr><td>8&ndash;9</td><td>Unit + e2e tests (ledger invariant, transaction rollback, commission math)</td></tr>
+            <tr><td>10</td><td>Code review, merge</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sprint-deliverables"><strong>Deliverables:</strong> Cash payment flow, wallet ledger, commission capture.</p>
+      <p class="sprint-acceptance">E2E: booking complete &rarr; commission deducted &rarr; nurse wallet balance correct &rarr; ledger sum == balance.</p>
+    </div>
+  </article>
+
+  <aside class="callout">
+    <div class="callout-title">Phase A (MVP) Gate</div>
+    <p>Sprints 1&ndash;5 complete. Patient can register, request, get offers, accept, track, chat, pay cash, rate. Nurse can register, verify, receive requests, offer, navigate, chat, get paid.</p>
+  </aside>
+
+  <article class="sprint">
+    <header class="sprint-head">
+      <span class="sprint-num">Sprint 6</span>
+      <span class="sprint-title">Admin + Audit + Service Catalog</span>
+      <span class="sprint-meta">10 days &middot; BE-1 + BE-3</span>
+    </header>
+    <div class="sprint-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>Owner</th><th>Task</th></tr></thead>
+          <tbody>
+            <tr><td>1&ndash;2</td><td>BE-1</td><td><code>admin.service</code>: dashboard KPIs (real counts from DB)</td></tr>
+            <tr><td>3</td><td>BE-1</td><td>Nurse verification queue: <code>GET /admin/nurses/pending-verification</code>, <code>POST /admin/nurses/:id/verify</code> (emits <code>nurse.verified</code>), <code>POST /admin/nurses/:id/reject</code></td></tr>
+            <tr><td>3</td><td>BE-3</td><td><code>AuditLogInterceptor</code> in <code>common/interceptors/</code>, bound to admin controller &mdash; captures actorId, action, resourceType, IP</td></tr>
+            <tr><td>4</td><td>BE-1</td><td>User management: <code>GET /admin/users</code>, <code>PATCH /admin/users/:id/status</code> (suspend/ban)</td></tr>
+            <tr><td>4</td><td>BE-3</td><td>Service catalog CRUD: <code>POST /admin/services</code>, <code>PUT /admin/services/:id</code>, <code>GET /services</code> (public)</td></tr>
+            <tr><td>5</td><td>BE-1</td><td>Booking oversight: <code>GET /admin/bookings</code>, <code>POST /admin/bookings/:id/dispute</code></td></tr>
+            <tr><td>5</td><td>BE-3</td><td>Commission config: <code>PATCH /admin/commission/:serviceId</code> (super-admin only)</td></tr>
+            <tr><td>6</td><td>BE-1</td><td>Finance overview: <code>GET /admin/finance/overview</code></td></tr>
+            <tr><td>7</td><td>BE-3</td><td><code>GET /admin/audit-logs</code> with filters</td></tr>
+            <tr><td>8&ndash;9</td><td>Both</td><td>Unit + e2e tests (verify flow, audit log capture, role enforcement)</td></tr>
+            <tr><td>10</td><td>Both</td><td>Remove <code>@Public()</code> from all admin endpoints; enforce <code>@Roles(ADMIN)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sprint-deliverables"><strong>Deliverables:</strong> Full admin portal backend, audit trail live.</p>
+    </div>
+  </article>
+
+  <article class="sprint">
+    <header class="sprint-head">
+      <span class="sprint-num">Sprint 7</span>
+      <span class="sprint-title">Analytics + Online Payments</span>
+      <span class="sprint-meta">10 days &middot; BE-2 + BE-3</span>
+    </header>
+    <div class="sprint-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>Owner</th><th>Task</th></tr></thead>
+          <tbody>
+            <tr><td>1&ndash;2</td><td>BE-3</td><td><code>analytics.service</code>: revenue aggregation pipeline over <code>payments</code></td></tr>
+            <tr><td>3</td><td>BE-3</td><td>Booking funnel aggregation, service distribution, nurse performance</td></tr>
+            <tr><td>4</td><td>BE-3</td><td>CSV export endpoint</td></tr>
+            <tr><td>5</td><td>BE-3</td><td>Unit + e2e tests for analytics</td></tr>
+            <tr><td>1&ndash;3</td><td>BE-2</td><td>Paymob integration: create payment intent, redirect URL, webhook handler with HMAC verification</td></tr>
+            <tr><td>4&ndash;5</td><td>BE-2</td><td>Fawry integration: reference code generation, webhook handler</td></tr>
+            <tr><td>6</td><td>BE-2</td><td>Wire payment completion &rarr; booking status <code>PAYMENT_COMPLETED</code> via event</td></tr>
+            <tr><td>7</td><td>BE-2</td><td>Refund flow: <code>POST /admin/payments/:id/refund</code></td></tr>
+            <tr><td>8&ndash;9</td><td>BE-2</td><td>Unit + e2e tests (webhook signature, payment&rarr;booking linkage)</td></tr>
+            <tr><td>10</td><td>Both</td><td>Code review, merge</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sprint-deliverables"><strong>Deliverables:</strong> Analytics endpoints, Paymob + Fawry live.</p>
+    </div>
+  </article>
+
+  <article class="sprint">
+    <header class="sprint-head">
+      <span class="sprint-num">Sprint 8</span>
+      <span class="sprint-title">Hardening + CI</span>
+      <span class="sprint-meta">10 days &middot; BE-3 + DevOps</span>
+    </header>
+    <div class="sprint-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>Task</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>GitHub Actions workflow: lint, typecheck, test, build on PR</td></tr>
+            <tr><td>2</td><td>Docker Compose healthchecks for mongo, minio, api</td></tr>
+            <tr><td>3</td><td><code>.env.example</code> with all vars, documented</td></tr>
+            <tr><td>4</td><td>Per-endpoint rate limits (auth: 5/min, booking: 30/min, etc.) &mdash; replace removed throttle</td></tr>
+            <tr><td>5</td><td>Input validation audit: every DTO has class-validator rules</td></tr>
+            <tr><td>6</td><td>Security audit: injection, IDOR, broken auth, mass assignment</td></tr>
+            <tr><td>7</td><td>Swagger: complete API docs, group by tag, add examples</td></tr>
+            <tr><td>8</td><td>E2E regression suite: full booking&rarr;payment&rarr;rating flow</td></tr>
+            <tr><td>9</td><td>Performance: add missing indexes (verify all schema indexes applied), EXPLAIN on slow queries</td></tr>
+            <tr><td>10</td><td>Production readiness checklist sign-off</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="sprint-deliverables"><strong>Deliverables:</strong> CI live, security audited, docs complete.</p>
+    </div>
+  </article>
+
+  <aside class="callout">
+    <div class="callout-title">Phase B (Production) Gate</div>
+    <p>Sprints 6&ndash;8 complete. Admin portal functional, online payments live, audit trail comprehensive, CI prevents bad merges.</p>
+  </aside>
+
+  <article class="sprint">
+    <header class="sprint-head">
+      <span class="sprint-num">Sprint 9+</span>
+      <span class="sprint-title">Scale &amp; Optimization</span>
+      <span class="sprint-meta">Phase C</span>
+    </header>
+    <div class="sprint-body">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Task</th><th>Sprint</th></tr></thead>
+          <tbody>
+            <tr><td>Winston logger module (replace Nest default)</td><td>9</td></tr>
+            <tr><td><code>prom-client</code> + <code>/metrics</code> endpoint + Grafana dashboards</td><td>9</td></tr>
+            <tr><td>MongoDB Atlas prod provisioning, backup schedule, point-in-time recovery</td><td>9</td></tr>
+            <tr><td>ECS Fargate task definition + ALB + TLS 1.3</td><td>9</td></tr>
+            <tr><td>Query profiling, index tuning, aggregation optimization</td><td>10</td></tr>
+            <tr><td>Socket.IO Redis adapter (horizontal scale)</td><td>10</td></tr>
+            <tr><td>Sharding key selection for <code>bookings</code>, <code>wallet_transactions</code></td><td>10</td></tr>
+            <tr><td>API versioning strategy (v2 path)</td><td>10</td></tr>
+            <tr><td>Load testing (k6 or Artillery) &mdash; 10k concurrent bookings</td><td>10</td></tr>
+            <tr><td>Disaster recovery runbook</td><td>11</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </article>
+
+</section>
+
+<section id="team">
+  <h2>Team Assignment Recommendations</h2>
+
+  <h3>Recommended Composition</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Role</th><th>Count</th><th>Focus</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>BE-1</strong> (Senior)</td><td>1</td><td>Booking, admin, state machines, transactional logic</td></tr>
+        <tr><td><strong>BE-2</strong> (Mid)</td><td>1</td><td>Users, upload, location, payment, integrations</td></tr>
+        <tr><td><strong>BE-3</strong> (Mid)</td><td>1</td><td>Notifications, chat, analytics, cross-cutting (audit, interceptors)</td></tr>
+        <tr><td><strong>DevOps</strong></td><td>0.5</td><td>CI, Docker, Atlas, ECS (shared across team)</td></tr>
+        <tr><td><strong>QA</strong></td><td>0.5</td><td>E2E regression, load tests (Sprint 8+)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Parallel Track Map (3 backend devs)</h3>
+  <div class="graph">
+<pre>Sprint 1   BE-1: users CRUD         | BE-2: upload + location      | BE-3: —
+Sprint 2   BE-1: booking core       | BE-2: matching + SOS         | BE-3: —
+Sprint 3   BE-1: —                  | BE-2: —                      | BE-3: notifications + FCM
+Sprint 4   BE-1: chat REST support  | BE-2: —                      | BE-3: chat gateway
+Sprint 5   BE-1: —                  | BE-2: payment + wallet       | BE-3: —
+Sprint 6   BE-1: admin core         | BE-2: —                      | BE-3: audit + service catalog
+Sprint 7   BE-1: —                  | BE-2: Paymob + Fawry         | BE-3: analytics
+Sprint 8   BE-1: performance        | BE-2: e2e regression         | BE-3: CI + security audit</pre>
+  </div>
+
+  <h4>Dependency conflict avoidance</h4>
+  <ul>
+    <li>BE-1 owns the booking state machine; BE-2 consumes it via service injection (no shared mutation).</li>
+    <li>BE-2 owns wallet transactions; BE-1's booking service emits <code>booking.completed</code> and does not touch wallet.</li>
+    <li>BE-3 owns notifications + chat sockets; consumes events from outbox only — never calls booking service directly.</li>
+    <li>Shared interfaces (event payloads, DTOs) are agreed in Sprint 0 design doc before parallel work starts.</li>
+  </ul>
+
+  <h3>If Only 1 Backend Dev</h3>
+  <p>Sequential: S1 → S2 → S3 → S4 → S5 → S6 → S7 → S8 → S9.</p>
+  <p class="note">Estimate: 18–20 weeks for MVP + Production.</p>
+
+  <h3>If 2 Backend Devs</h3>
+  <div class="graph">
+<pre>S1: BE-1 users | BE-2 upload + location
+S2: BE-1 booking core | BE-2 matching + SOS
+S3: BE-1 payment prep (wallet schema, ledger design) | BE-2 notifications + FCM
+S4: BE-1 chat | BE-2 payment + wallet
+S5: BE-1 admin | BE-2 analytics
+S6: BE-1 hardening + CI | BE-2 Paymob + Fawry</pre>
+  </div>
+  <p class="note">Estimate: 12–14 weeks.</p>
+</section>
+
+<section id="risks">
+  <h2>Risks &amp; Blockers</h2>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th><th>Owner</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>R-1</strong></td><td>SOS race condition → double-accept</td><td><span class="pill pill-p0">Low</span></td><td>Critical</td><td>Atomic <code>findOneAndUpdate</code> with status precondition + unit test with 10 concurrent calls</td><td>BE-1</td></tr>
+        <tr><td><strong>R-2</strong></td><td>Wallet ledger drift (balance != sum transactions)</td><td><span class="pill pill-p1">Medium</span></td><td>Critical</td><td>MongoDB multi-document transactions; daily reconciliation cron</td><td>BE-2</td></tr>
+        <tr><td><strong>R-3</strong></td><td>$geoNear performance degradation at scale</td><td><span class="pill pill-p1">Medium</span></td><td>Medium</td><td>Compound index <code>{ location: 2dsphere, isOnline: 1, verificationStatus: 1 }</code>; cap radius</td><td>BE-2</td></tr>
+        <tr><td><strong>R-4</strong></td><td>Twilio SMS delivery to Egypt unreliable</td><td><span class="pill pill-p1">Medium</span></td><td>High</td><td>Stub provider for dev; fallback to alphanumeric sender ID; retry queue</td><td>BE-3</td></tr>
+        <tr><td><strong>R-5</strong></td><td>FCM delivery to Egyptian Android devices unreliable</td><td><span class="pill pill-p1">Medium</span></td><td>Medium</td><td>Socket.IO fallback for in-app; retry FCM with exponential backoff</td><td>BE-3</td></tr>
+        <tr><td><strong>R-6</strong></td><td>Paymob/Fawry webhook spoofing</td><td><span class="pill pill-p0">Low</span></td><td>Critical</td><td>HMAC signature verification; idempotency key on webhook handler</td><td>BE-2</td></tr>
+        <tr><td><strong>R-7</strong></td><td>Nurse verification backlog &gt; 72h SLA</td><td><span class="pill pill-p1">Medium</span></td><td>Medium</td><td>Admin dashboard SLA countdown; escalation on overdue</td><td>BE-1</td></tr>
+        <tr><td><strong>R-8</strong></td><td>Socket.IO memory growth at 10k connections</td><td><span class="pill pill-p1">Medium</span></td><td>Medium</td><td>Redis adapter in Sprint 10; connection cleanup on disconnect</td><td>BE-3</td></tr>
+        <tr><td><strong>R-9</strong></td><td>MongoDB Atlas region availability (me-south-1)</td><td><span class="pill pill-p0">Low</span></td><td>High</td><td>Multi-region replica set; tested failover</td><td>DevOps</td></tr>
+        <tr><td><strong>R-10</strong></td><td>Cash payment reconciliation (no online proof)</td><td><span class="pill pill-p2">High</span></td><td>Medium</td><td>Nurse prepaid balance enforcement; admin manual reconciliation tool; audit log</td><td>BE-2</td></tr>
+        <tr><td><strong>R-11</strong></td><td>Scope creep into donations / AI features</td><td><span class="pill pill-p2">High</span></td><td>Medium</td><td>Explicitly deferred (Section 10); PM sign-off required to add</td><td>PM</td></tr>
+        <tr><td><strong>R-12</strong></td><td>Arabic text search performance</td><td><span class="pill pill-p0">Low</span></td><td>Low</td><td>MongoDB text index with Arabic stemmer if search added</td><td>BE-1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Current Blockers</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Blocker</th><th>Status</th><th>Resolution</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>users.service</code> returns mock data</td><td><span class="pill pill-partial">Open</span></td><td>Sprint 1</td></tr>
+        <tr><td>All non-auth endpoints <code>@Public()</code></td><td><span class="pill pill-partial">Open</span></td><td>Removed as each module goes live (S1, S2, S5, S6)</td></tr>
+        <tr><td>No MinIO integration</td><td><span class="pill pill-partial">Open</span></td><td>Sprint 1</td></tr>
+        <tr><td>No Socket.IO auth</td><td><span class="pill pill-partial">Open</span></td><td>Sprint 3 (notifications) + Sprint 4 (chat)</td></tr>
+        <tr><td><code>analytics</code> has no schemas</td><td><span class="pill pill-partial">Open</span></td><td>Sprint 7 (aggregations only, no new schemas needed)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="dod">
+  <h2>Definition of Done</h2>
+
+  <h3>8.1 Per-Sprint DoD</h3>
+  <ul class="checklist">
+    <li>All service methods implemented — no mock data, no hardcoded IDs</li>
+    <li>Unit tests pass with ≥80% coverage on new code</li>
+    <li>E2E tests pass for new endpoints</li>
+    <li>No <code>@Public()</code> on endpoints requiring auth (unless explicitly public: service catalog GET, health)</li>
+    <li><code>@Roles()</code> applied where role-specific access needed</li>
+    <li>Swagger <code>@ApiOperation</code> + <code>@ApiBearerAuth</code> on every new endpoint</li>
+    <li>Arabic error messages for user-facing errors</li>
+    <li>No lint errors (<code>npm run lint</code>)</li>
+    <li>Docker image builds (<code>docker build .</code>)</li>
+    <li>PR reviewed by at least one other backend dev</li>
+    <li>No new TODO comments without linked ticket</li>
+  </ul>
+
+  <h3>8.2 Phase A (MVP) DoD</h3>
+  <ul class="checklist">
+    <li>Patient can: register (OTP) → create profile → add address → search nearby nurses → create request → receive offers → select nurse → chat → track visit → pay cash → rate</li>
+    <li>Nurse can: register (OTP) → upload documents → (admin verifies) → toggle availability → receive requests → submit offers → accept SOS → advance lifecycle → chat → collect cash → see wallet balance</li>
+    <li>All 9 modules have real implementations (no stubs returning mock data)</li>
+    <li>E2E regression suite covers the full flow above</li>
+    <li>Docker Compose brings up full stack with <code>make up</code></li>
+    <li>Staging environment deployed and accessible to Flutter team</li>
+  </ul>
+
+  <h3>8.3 Phase B (Production) DoD</h3>
+  <ul class="checklist">
+    <li>Admin can: login with 2FA → view dashboard → verify nurses → manage users → resolve disputes → configure commission → view finance → export analytics</li>
+    <li>Paymob + Fawry webhooks verified with real test credentials</li>
+    <li>Audit log captures every admin mutation</li>
+    <li>CI pipeline blocks merges on failing tests</li>
+    <li>Security audit passed (no critical/high findings)</li>
+    <li>Swagger docs published and shared with Flutter team</li>
+    <li><code>.env.example</code> complete and documented</li>
+    <li>Load test: 1000 concurrent users, p95 latency &lt; 500ms</li>
+  </ul>
+
+  <h3>8.4 Phase C (Scale) DoD</h3>
+  <ul class="checklist">
+    <li>Prometheus + Grafana dashboards live</li>
+    <li>Winston structured logs shipped to log aggregator</li>
+    <li>MongoDB Atlas prod with automated backups + point-in-time recovery</li>
+    <li>ECS Fargate + ALB + TLS 1.3 in production</li>
+    <li>Load test: 10k concurrent bookings, p95 &lt; 2s</li>
+    <li>Disaster recovery runbook tested</li>
+    <li>Socket.IO Redis adapter for horizontal scale</li>
+    <li>Sharding strategy documented (even if not yet applied)</li>
+  </ul>
+</section>
+
+<section id="infra">
+  <h2>Infrastructure &amp; DevOps Roadmap</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Item</th><th>Phase</th><th>Sprint</th><th>Owner</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Docker Compose (done)</td><td><span class="pill pill-p0">MVP</span></td><td>—</td><td>—</td></tr>
+        <tr><td>Multi-stage Dockerfile (done)</td><td><span class="pill pill-p0">MVP</span></td><td>—</td><td>—</td></tr>
+        <tr><td>Health endpoints (done)</td><td><span class="pill pill-p0">MVP</span></td><td>—</td><td>—</td></tr>
+        <tr><td>GitHub Actions CI</td><td><span class="pill pill-p2">Prod</span></td><td>8</td><td>DevOps</td></tr>
+        <tr><td>Docker Compose healthchecks</td><td><span class="pill pill-p2">Prod</span></td><td>8</td><td>DevOps</td></tr>
+        <tr><td><code>.env.example</code></td><td><span class="pill pill-p2">Prod</span></td><td>8</td><td>DevOps</td></tr>
+        <tr><td>MongoDB Atlas M10+ provisioning</td><td><span class="pill pill-p2">Prod</span></td><td>9</td><td>DevOps</td></tr>
+        <tr><td>ECS Fargate task definition</td><td><span class="pill pill-p2">Prod</span></td><td>9</td><td>DevOps</td></tr>
+        <tr><td>ALB + TLS 1.3</td><td><span class="pill pill-p2">Prod</span></td><td>9</td><td>DevOps</td></tr>
+        <tr><td>AWS Secrets Manager</td><td><span class="pill pill-p2">Prod</span></td><td>9</td><td>DevOps</td></tr>
+        <tr><td>S3 + CloudFront (replace MinIO)</td><td><span class="pill pill-p2">Prod</span></td><td>9</td><td>DevOps</td></tr>
+        <tr><td>Prometheus + Grafana</td><td><span class="pill pill-p3">Scale</span></td><td>9</td><td>DevOps</td></tr>
+        <tr><td>Winston logger module</td><td><span class="pill pill-p3">Scale</span></td><td>9</td><td>BE-3</td></tr>
+        <tr><td>Socket.IO Redis adapter</td><td><span class="pill pill-p3">Scale</span></td><td>10</td><td>BE-3</td></tr>
+        <tr><td>Sharding strategy doc</td><td><span class="pill pill-p3">Scale</span></td><td>10</td><td>BE-1</td></tr>
+        <tr><td>Load testing (k6)</td><td><span class="pill pill-p3">Scale</span></td><td>10</td><td>QA</td></tr>
+        <tr><td>Disaster recovery runbook</td><td><span class="pill pill-p3">Scale</span></td><td>11</td><td>DevOps</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="scope">
+  <h2>Out of BRD v1.4 Scope (Future Considerations)</h2>
+  <p>The following areas from the roadmap prompt are <strong>not in BRD v1.4</strong> and are explicitly deferred to prevent scope creep. They require PM sign-off before addition.</p>
+
+  <div class="callout warn">
+    <div class="callout-title">PM Sign-Off Required</div>
+    <p>The items below are deferred and outside BRD v1.4 scope. Adding any of them requires explicit PM sign-off and a change request. Scope creep into these areas risks the MVP timeline (Sprints 1–5) and the Production gate (Sprints 6–8). Track via R-11.</p>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Area</th><th>Status</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Donations &amp; Financial Transactions</strong> (beyond wallet)</td><td><span class="pill pill-missing">Out of scope</span></td><td>BRD covers commission, wallet, Paymob/Fawry, cash only. No donation/fundraising flow defined.</td></tr>
+        <tr><td><strong>AI Features</strong></td><td><span class="pill pill-missing">Out of scope</span></td><td>BRD mentions no AI. Possible future: smart nurse ranking, demand prediction, chat translation — requires separate PRD.</td></tr>
+        <tr><td><strong>Content Management</strong> (beyond service catalog)</td><td><span class="pill pill-missing">Out of scope</span></td><td>BRD's "CMS" = service catalog CRUD only (admin module). No articles, banners, or CMS pages defined.</td></tr>
+        <tr><td><strong>Multi-language</strong></td><td><span class="pill pill-missing">Out of scope</span></td><td>BRD: Arabic-only, RTL. English support not planned for Year 1.</td></tr>
+        <tr><td><strong>Multi-city expansion</strong></td><td><span class="pill pill-missing">Out of scope</span></td><td>BRD: Greater Cairo only for launch.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="api-surface">
+  <h2>API Surface Summary (Target State)</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Endpoint Count (target)</th><th>Auth</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>auth</td><td>8 (done)</td><td>Public + JWT</td></tr>
+        <tr><td>users</td><td>13</td><td>JWT + roles</td></tr>
+        <tr><td>booking</td><td>12</td><td>JWT + roles</td></tr>
+        <tr><td>payment</td><td>8</td><td>JWT + roles + webhooks (HMAC)</td></tr>
+        <tr><td>location</td><td>3</td><td>JWT + roles</td></tr>
+        <tr><td>chat</td><td>1 REST + 3 WS</td><td>JWT (REST + socket handshake)</td></tr>
+        <tr><td>notifications</td><td>4</td><td>JWT</td></tr>
+        <tr><td>admin</td><td>14</td><td>JWT + ADMIN role</td></tr>
+        <tr><td>analytics</td><td>5</td><td>JWT + ADMIN role</td></tr>
+        <tr><td>upload</td><td>2</td><td>JWT</td></tr>
+        <tr><td>health</td><td>2 (done)</td><td>Public</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>~72 endpoints</strong></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="diagrams">
+  <h2>Diagrams → Module Mapping</h2>
+  <p>Source files in <code>diagrams/usecase/</code> and <code>diagrams/sequence/</code> (PlantUML + rendered SVG). Each diagram informs one or more modules and sprints below.</p>
+
+  <h3>12.1 Use Case Diagrams</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>File</th><th>Title</th><th>Actors</th><th>Use Cases</th><th>Modules Informed</th><th>Sprint</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>diagrams/usecase/usecase-overall.puml</code></td><td>System-Level Use Case</td><td>Patient, Nurse, Admin, Super Admin, Paymob, Fawry</td><td>28 use cases across 7 system boundaries</td><td>All modules — master scope reference</td><td>All</td></tr>
+        <tr><td><code>diagrams/usecase/usecase-patient.puml</code></td><td>Patient Use Case</td><td>Patient</td><td>21 patient use cases + 3 payment methods</td><td>auth, users, booking, payment, notifications, chat</td><td>S1, S2, S4, S5</td></tr>
+        <tr><td><code>diagrams/usecase/usecase-nurse.puml</code></td><td>Nurse Use Case</td><td>Nurse</td><td>27 use cases across 6 groups (account, availability, offers, SOS, visit, wallet)</td><td>auth, users, booking, payment, location, chat, notifications</td><td>S1, S2, S4, S5</td></tr>
+        <tr><td><code>diagrams/usecase/usecase-admin.puml</code></td><td>Admin &amp; Super Admin Use Case</td><td>Admin, Super Admin (inherits Admin)</td><td>32 use cases across 9 groups</td><td>admin, analytics, audit, notifications</td><td>S6, S7</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Key use cases not previously captured in roadmap</h4>
+  <ul>
+    <li>Patient: "Re-book Previous Service" (UC18), "Delete Account (Anonymize)" (UC21), "View Booking History" (UC17)</li>
+    <li>Nurse: "View Own Ratings &amp; Reviews" (N27), "View Earnings Analytics" (N25), "Withdraw Offer" (N10), "Reject Incoming Request" (N8), "Reject Assignment" (N12)</li>
+    <li>Admin: "Manage Other Admins" (A32, super admin only), "Manage FAQ &amp; Content" (A30), "Add Review Comments" on verification (A4_Reason), "Broadcast Push Notifications" (A29)</li>
+  </ul>
+
+  <h3>12.2 Sequence Diagrams</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>File</th><th>Flow</th><th>Key Participants</th><th>Modules Involved</th><th>Sprint</th><th>New Business Rules Surfaced</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>diagrams/sequence/seq-registration.puml</code></td><td>OTP registration (patient + nurse)</td><td>User, App, Gateway, Auth, User Service, SMS, DB</td><td>auth, users</td><td>✅ Done</td><td><strong>Refresh token = 30 days</strong> (diagram) vs 7d (current code) — discrepancy, see 12.4</td></tr>
+        <tr><td><code>diagrams/sequence/seq-nurse-onboarding.puml</code></td><td>Nurse onboarding + verification + license expiry watchdog</td><td>Nurse, App, User Service, Document Service, Notification, Admin</td><td>users, upload, admin, notifications</td><td>S1, S6</td><td>License expiry cron: 30d warning, 7d urgent, auto-offline on expiry; daily cron job; re-verification cycle</td></tr>
+        <tr><td><code>diagrams/sequence/seq-booking-overall.puml</code></td><td>Standard booking end-to-end</td><td>Patient, Booking, Location, Notification, Nurse, Payment, Wallet</td><td>booking, location, notifications, payment</td><td>S2, S5</td><td><strong>Offer ranking formula</strong>: <code>score = rating*0.4 + (1/price_norm)*0.3 + (1/eta_norm)*0.3</code>; <strong>Location update intervals</strong>: SOS 3s, Standard 5s, Idle 30s; <strong>Auto-close after 72h</strong> if no rating; Booking validates "patient has no active booking"</td></tr>
+        <tr><td><code>diagrams/sequence/seq-scheduled-booking.puml</code></td><td>Scheduled booking + cron trigger</td><td>Patient, Booking, Scheduler, Notification, Nurse</td><td>booking</td><td>S2</td><td>Schedule rules: min 2h, max 7d ahead; <code>broadcast_at = scheduled_for - 30min</code>; cron runs every minute; <strong>free cancel up to 1h before</strong>; 15-min pre-visit reminder to both parties</td></tr>
+        <tr><td><code>diagrams/sequence/seq-sos-emergency.puml</code></td><td>SOS emergency dispatch</td><td>Patient, Booking, Location, Notification, Nurse 1..N, Admin, Payment, Wallet</td><td>booking, location, notifications, admin, payment</td><td>S2</td><td><strong>Patient SOS rate limit: 1 per 15 min</strong>; radius 20km expandable to 30km; 2-min timeout → patient notified + admin alerted; 3s location refresh; admin SOS monitor (real-time); SOS completion rate target &gt;95%, acceptance &lt;60s</td></tr>
+        <tr><td><code>diagrams/sequence/seq-cancellation-reassign.puml</code></td><td>Nurse cancellation + reassignment</td><td>Patient, Booking, Notification, Nurse, Admin</td><td>booking, notifications, admin</td><td>S2</td><td><strong>5 mandatory cancellation reasons</strong> (personal emergency, too far, outside specialization, transport, other); nurse cancellation counter incremented; <strong>cancellation rate &gt;15% triggers admin alert</strong>; reassignment excludes cancelling nurse; audit captures original nurse + reason + time-to-reassignment</td></tr>
+        <tr><td><code>diagrams/sequence/seq-payment-wallet.puml</code></td><td>Payment + wallet + ledger + withdrawal</td><td>Patient, Payment, Wallet, Ledger, Nurse, Admin</td><td>payment</td><td>S5, S7</td><td><strong>Double-entry ledger</strong>: Patient Payment (DR) → Platform Holding (CR); Commission (DR) → Platform Revenue (CR); Platform Holding (DR) → Nurse Wallet (CR); <strong>Cash: commission from prepaid balance, debt if insufficient</strong>; <strong>Withdrawal methods</strong>: Vodafone Cash, Etisalat Cash/WE Pay, InstaPay; min EGP 100; 1-3 business days; admin processes withdrawal queue</td></tr>
+        <tr><td><code>diagrams/sequence/seq-dispute-resolution.puml</code></td><td>Dispute filing + admin ruling + refund</td><td>Patient, Booking, Admin, Nurse, Wallet, Ledger, Notification</td><td>booking, admin, payment, notifications</td><td>S6</td><td><strong>Dispute window: 72h after visit completion</strong>; dispute freezes payment + locks rating; admin reviews chat + GPS history + timestamps; <strong>refund deducted from nurse wallet (platform does NOT absorb)</strong>; negative balance tracked as debt against future earnings; final status DISPUTE_REFUNDED or DISPUTE_REJECTED → CLOSED</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>12.3 Business Rules Surfaced from Diagrams (Must Implement)</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Rule</th><th>Source Diagram</th><th>Module</th><th>Sprint</th><th>Priority</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>BR-D1</strong></td><td>Refresh token TTL = 30 days (not 7d)</td><td>seq-registration</td><td>auth</td><td>Verify</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D2</strong></td><td>License expiry daily cron: 30d warning, 7d urgent, auto-offline on expiry</td><td>seq-nurse-onboarding</td><td>users</td><td>S6</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D3</strong></td><td>License re-verification cycle (nurse re-uploads → admin re-reviews)</td><td>seq-nurse-onboarding</td><td>users, admin</td><td>S6</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D4</strong></td><td>Offer ranking: <code>rating*0.4 + (1/price_norm)*0.3 + (1/eta_norm)*0.3</code></td><td>seq-booking-overall</td><td>booking</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D5</strong></td><td>Patient can re-sort offers by price / rating / ETA</td><td>seq-booking-overall</td><td>booking</td><td>S2</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D6</strong></td><td>Location update intervals: SOS 3s, Standard 5s, Idle 30s</td><td>seq-booking-overall</td><td>location</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D7</strong></td><td>Booking auto-close after 72h if no rating submitted</td><td>seq-booking-overall</td><td>booking</td><td>S2</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D8</strong></td><td>Patient cannot have 2 active bookings (validation on request create)</td><td>seq-booking-overall</td><td>booking</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D9</strong></td><td>Scheduled booking: min 2h, max 7d ahead; <code>broadcast_at = scheduled_for - 30min</code></td><td>seq-scheduled-booking</td><td>booking</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D10</strong></td><td>Scheduled booking: free cancel up to 1h before</td><td>seq-scheduled-booking</td><td>booking</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D11</strong></td><td>Scheduled booking: 15-min pre-visit reminder to both parties</td><td>seq-scheduled-booking</td><td>booking, notifications</td><td>S3</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D12</strong></td><td>Scheduler cron runs every minute for due scheduled bookings</td><td>seq-scheduled-booking</td><td>booking</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D13</strong></td><td>SOS: patient rate limit 1 per 15 min</td><td>seq-sos-emergency</td><td>booking</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D14</strong></td><td>SOS: radius 20km → 30km expansion; 2-min timeout</td><td>seq-sos-emergency</td><td>booking, location</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D15</strong></td><td>SOS: admin real-time monitor (dedicated SOS dashboard)</td><td>seq-sos-emergency</td><td>admin</td><td>S6</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D16</strong></td><td>SOS: 3-second location refresh during en-route</td><td>seq-sos-emergency</td><td>location</td><td>S2</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D17</strong></td><td>Nurse cancellation: 5 mandatory predefined reasons</td><td>seq-cancellation-reassign</td><td>booking</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D18</strong></td><td>Nurse cancellation counter; rate &gt;15% → admin alert</td><td>seq-cancellation-reassign</td><td>booking, admin</td><td>S2, S6</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D19</strong></td><td>Reassignment: exclude cancelling nurse from re-broadcast</td><td>seq-cancellation-reassign</td><td>booking</td><td>S2</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D20</strong></td><td>Payment: double-entry ledger (3 entry pairs per payment)</td><td>seq-payment-wallet</td><td>payment</td><td>S5</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D21</strong></td><td>Cash: commission from prepaid balance; debt if insufficient</td><td>seq-payment-wallet</td><td>payment</td><td>S5</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D22</strong></td><td>Withdrawal methods: Vodafone Cash, Etisalat Cash/WE Pay, InstaPay</td><td>seq-payment-wallet</td><td>payment</td><td>S5</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D23</strong></td><td>Withdrawal: min EGP 100, 1-3 business days, admin processes queue</td><td>seq-payment-wallet</td><td>payment, admin</td><td>S5, S6</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D24</strong></td><td>Dispute window: 72h after visit completion</td><td>seq-dispute-resolution</td><td>booking</td><td>S6</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D25</strong></td><td>Dispute: freeze payment, lock rating</td><td>seq-dispute-resolution</td><td>booking, payment</td><td>S6</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D26</strong></td><td>Dispute: refund from nurse wallet (platform never absorbs)</td><td>seq-dispute-resolution</td><td>payment, admin</td><td>S6</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D27</strong></td><td>Dispute: negative balance → debt tracked against future earnings</td><td>seq-dispute-resolution</td><td>payment</td><td>S6</td><td><span class="pill pill-p0">High</span></td></tr>
+        <tr><td><strong>BR-D28</strong></td><td>Patient: "Delete Account (Anonymize)" use case</td><td>usecase-patient</td><td>users</td><td>S6</td><td><span class="pill pill-p3">Low</span></td></tr>
+        <tr><td><strong>BR-D29</strong></td><td>Patient: "Re-book Previous Service" use case</td><td>usecase-patient</td><td>booking</td><td>S2</td><td><span class="pill pill-p3">Low</span></td></tr>
+        <tr><td><strong>BR-D30</strong></td><td>Nurse: "View Own Ratings &amp; Reviews" + "View Earnings Analytics"</td><td>usecase-nurse</td><td>users, analytics</td><td>S7</td><td><span class="pill pill-p3">Low</span></td></tr>
+        <tr><td><strong>BR-D31</strong></td><td>Admin: "Manage Other Admins" (super admin only)</td><td>usecase-admin</td><td>admin</td><td>S6</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D32</strong></td><td>Admin: "Broadcast Push Notifications" to all/segmented users</td><td>usecase-admin</td><td>admin, notifications</td><td>S6</td><td><span class="pill pill-p1">Medium</span></td></tr>
+        <tr><td><strong>BR-D33</strong></td><td>Admin: "Manage FAQ &amp; Content"</td><td>usecase-admin</td><td>admin</td><td>S6+</td><td><span class="pill pill-p3">Low</span></td></tr>
+        <tr><td><strong>BR-D34</strong></td><td>Admin verification: "Add Review Comments" on approve/reject</td><td>usecase-admin</td><td>admin</td><td>S6</td><td><span class="pill pill-p1">Medium</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>12.4 Discrepancies Between Diagrams and Current Code</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Topic</th><th>Diagram Says</th><th>Code Says</th><th>Resolution</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>D-1</strong></td><td>Refresh token TTL</td><td>30 days (<code>seq-registration.puml</code> line 134, 173)</td><td>7 days (<code>config/validation.ts</code> <code>JWT_REFRESH_EXPIRY: '7d'</code>)</td><td><strong>Confirm with PM</strong>. BRD §3.6 says "refresh 7d". Diagram says 30d. Recommend following BRD (7d) and updating diagram.</td></tr>
+        <tr><td><strong>D-2</strong></td><td>Nurse <code>verification_status</code> on registration</td><td><code>PENDING</code> (<code>seq-registration.puml</code> line 159)</td><td><code>INCOMPLETE</code> (default in <code>nurse.schema.ts</code> line 40, enum)</td><td>Diagram is correct flow-wise: nurse uploads docs → status becomes PENDING. <code>INCOMPLETE</code> is initial state before doc upload. <strong>No conflict</strong> — schema is correct, diagram simplifies.</td></tr>
+        <tr><td><strong>D-3</strong></td><td>DB queries in diagram</td><td>SQL syntax (<code>SELECT * FROM users</code>, <code>INSERT INTO patient</code>)</td><td>MongoDB/Mongoose</td><td>Diagrams use generic SQL notation for readability. <strong>No conflict</strong> — implement as Mongoose equivalents.</td></tr>
+        <tr><td><strong>D-4</strong></td><td>Document size limit</td><td><code>&lt; 10MB</code> (<code>seq-nurse-onboarding.puml</code> line 71)</td><td>Not enforced yet (no upload module)</td><td>Implement 10MB limit in Sprint 1 upload module. Update roadmap Section 4.13 (was 5MB docs / 2MB photos — <strong>change to 10MB per diagram</strong>).</td></tr>
+        <tr><td><strong>D-5</strong></td><td>Payment webhook endpoint paths</td><td><code>/api/v1/payments/webhook/paymob</code>, <code>/api/v1/payments/webhook/fawry</code> (<code>seq-payment-wallet.puml</code>)</td><td><code>/webhooks/paymob</code>, <code>/webhooks/fawry</code> (current <code>payment.controller.ts</code>)</td><td>Align to diagram paths in Sprint 5.</td></tr>
+        <tr><td><strong>D-6</strong></td><td>Dispute endpoint path</td><td><code>POST /api/v1/bookings/{id}/dispute</code> (<code>seq-dispute-resolution.puml</code>)</td><td>Not implemented</td><td>Add in Sprint 6.</td></tr>
+        <tr><td><strong>D-7</strong></td><td>Admin intervene endpoint</td><td><code>POST /api/v1/admin/bookings/{id}/intervene</code> (<code>seq-dispute-resolution.puml</code>)</td><td>Not implemented</td><td>Add in Sprint 6.</td></tr>
+        <tr><td><strong>D-8</strong></td><td>SOS endpoint path</td><td><code>POST /api/v1/requests/sos</code> (<code>seq-sos-emergency.puml</code>)</td><td>Planned in booking controller</td><td>Confirm path in Sprint 2.</td></tr>
+        <tr><td><strong>D-9</strong></td><td>Booking status terminal states</td><td><code>DISPUTE_REFUNDED</code>, <code>DISPUTE_REJECTED</code> → <code>CLOSED</code> (<code>seq-dispute-resolution.puml</code>)</td><td>Not in <code>BookingStatus</code> enum (<code>common/enums/index.ts</code>) — only <code>DISPUTE</code> exists</td><td><strong>Add <code>DISPUTE_REFUNDED</code> and <code>DISPUTE_REJECTED</code> to enum</strong> in Sprint 6.</td></tr>
+        <tr><td><strong>D-10</strong></td><td>Select offer endpoint</td><td><code>POST /api/v1/requests/{id}/select-offer</code> (<code>seq-booking-overall.puml</code>)</td><td>Planned as <code>POST /offers/:id/accept</code> in roadmap Section 4.4</td><td><strong>Align to diagram</strong>: use <code>POST /requests/:id/select-offer</code>. Update roadmap.</td></tr>
+        <tr><td><strong>D-11</strong></td><td>Nurse confirm booking endpoint</td><td><code>POST /api/v1/nurse/bookings/{id}/confirm</code> (<code>seq-booking-overall.puml</code>)</td><td>Planned as <code>POST /bookings/:id/status</code></td><td>Add dedicated confirm endpoint in Sprint 2.</td></tr>
+        <tr><td><strong>D-12</strong></td><td>Cancellation endpoint</td><td><code>POST /api/v1/nurse/bookings/{id}/cancel</code> + <code>POST /api/v1/requests/{id}/cancel</code> (<code>seq-cancellation-reassign.puml</code>)</td><td>Planned as <code>POST /bookings/:id/cancel</code></td><td>Split into role-specific cancel endpoints per diagram.</td></tr>
+        <tr><td><strong>D-13</strong></td><td>Withdrawal endpoint</td><td><code>POST /api/v1/nurse/wallet/withdraw</code> (<code>seq-payment-wallet.puml</code>)</td><td>Planned same</td><td>Aligned.</td></tr>
+        <tr><td><strong>D-14</strong></td><td>Admin verify nurse endpoint</td><td><code>POST /api/v1/admin/nurses/{id}/verify</code> (<code>seq-nurse-onboarding.puml</code>)</td><td>Planned same</td><td>Aligned.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>12.5 Diagram-Informed Endpoint Corrections to Roadmap Section 4</h3>
+  <p>The following endpoint paths from sequence diagrams take precedence over the preliminary paths in Section 4:</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Roadmap Section 4 Path (old)</th><th>Diagram Path (authoritative)</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>booking</td><td><code>POST /offers/:id/accept</code></td><td><code>POST /requests/:id/select-offer</code></td><td>Replace</td></tr>
+        <tr><td>booking</td><td><code>POST /bookings/:id/status</code></td><td><code>POST /nurse/bookings/:id/confirm</code> + <code>PUT /bookings/:id/status</code> (lifecycle)</td><td>Split</td></tr>
+        <tr><td>booking</td><td><code>POST /bookings/:id/cancel</code></td><td><code>POST /nurse/bookings/:id/cancel</code> + <code>POST /requests/:id/cancel</code></td><td>Split by role</td></tr>
+        <tr><td>booking</td><td>(missing)</td><td><code>POST /bookings/:id/dispute</code></td><td>Add (S6)</td></tr>
+        <tr><td>admin</td><td>(missing)</td><td><code>POST /admin/bookings/:id/intervene</code></td><td>Add (S6)</td></tr>
+        <tr><td>payment</td><td><code>/webhooks/paymob</code></td><td><code>/payments/webhook/paymob</code></td><td>Align</td></tr>
+        <tr><td>payment</td><td><code>/webhooks/fawry</code></td><td><code>/payments/webhook/fawry</code></td><td>Align</td></tr>
+        <tr><td>upload</td><td>(5MB docs / 2MB photos)</td><td>10MB per diagram</td><td>Update limit</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>12.6 Diagrams to Create (Missing)</h3>
+  <p>The existing diagrams cover the core flows. The following additional diagrams are recommended for completeness but are <strong>not blocking</strong> for implementation:</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Diagram</th><th>Flow</th><th>Priority</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>seq-chat-messaging.puml</code></td><td>Socket.IO message send/receive/read</td><td><span class="pill pill-p1">Medium (S4)</span></td></tr>
+        <tr><td><code>seq-notifications-fcm.puml</code></td><td>Event → notification → FCM + socket emit</td><td><span class="pill pill-p3">Low (S3)</span></td></tr>
+        <tr><td><code>seq-token-refresh.puml</code></td><td>401 intercept → refresh → retry</td><td><span class="pill pill-p3">Low (auth done)</span></td></tr>
+        <tr><td><code>seq-admin-login-2fa.puml</code></td><td>Admin login + TOTP verify</td><td><span class="pill pill-p3">Low (auth done)</span></td></tr>
+        <tr><td><code>usecase-analytics.puml</code></td><td>Analytics-specific use cases</td><td><span class="pill pill-p3">Low (S7)</span></td></tr>
+        <tr><td><code>seq-audit-log.puml</code></td><td>Interceptor → audit log write</td><td><span class="pill pill-p3">Low (S6)</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="references">
+  <h2>References</h2>
+  <ul>
+    <li><code>docs/Nabdh_Platform_BRD_PRD_System_Design.md</code> v1.4 — source of truth</li>
+    <li><code>diagrams/usecase/*.puml</code> — 4 use case diagrams (overall, patient, nurse, admin)</li>
+    <li><code>diagrams/sequence/*.puml</code> — 8 sequence diagrams (registration, onboarding, booking, scheduled, SOS, cancellation, payment, dispute)</li>
+    <li><code>AUTH_API.md</code> — auth API spec for Flutter team (existing)</li>
+    <li><code>DOCKER_SETUP.md</code> — Docker instructions (existing)</li>
+    <li><code>BACKEND_AGENT_CONTEXT.md</code> — full C1–C19 decision log (referenced in BRD)</li>
+  </ul>
+</section>
+  </main>
+</div>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <div class="footer-meta">Nabdh Backend Roadmap</div>
+      <div style="margin-top:6px">Source: BRD v1.4 &middot; <code>BACKEND_ROADMAP.md</code></div>
+    </div>
+    <button class="back-top" id="backTop">&#8593; Back to top</button>
+  </div>
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===== Theme toggle =====
+  var html = document.documentElement;
+  var themeBtn = document.getElementById('themeToggle');
+  var themeIcon = document.getElementById('themeIcon');
+  var stored = null;
+  try { stored = localStorage.getItem('nabdh-theme'); } catch(e) {}
+  if (stored) {
+    html.setAttribute('data-theme', stored);
+    themeIcon.textContent = stored === 'dark' ? '\u263D' : '\u2600';
+  }
+  themeBtn.addEventListener('click', function() {
+    var cur = html.getAttribute('data-theme');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    themeIcon.textContent = next === 'dark' ? '\u263D' : '\u2600';
+    try { localStorage.setItem('nabdh-theme', next); } catch(e) {}
+  });
+
+  // ===== Scroll progress bar =====
+  var bar = document.getElementById('progressBar');
+  function updateProgress() {
+    var h = document.documentElement;
+    var scrollable = h.scrollHeight - h.clientHeight;
+    var pct = scrollable > 0 ? (h.scrollTop / scrollable) * 100 : 0;
+    bar.style.width = pct + '%';
+  }
+
+  // ===== Scroll-spy for TOC =====
+  var tocLinks = document.querySelectorAll('.toc a');
+  var sections = [];
+  tocLinks.forEach(function(l) {
+    var id = l.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (el) sections.push({link: l, el: el});
+  });
+  function onScroll() {
+    var scrollY = window.scrollY + 140;
+    var current = sections[0];
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].el.offsetTop <= scrollY) current = sections[i];
+    }
+    tocLinks.forEach(function(l) { l.classList.remove('active'); });
+    if (current) current.link.classList.add('active');
+    updateProgress();
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      requestAnimationFrame(function() { onScroll(); ticking = false; });
+      ticking = true;
+    }
+  }, { passive: true });
+  onScroll();
+
+  // ===== Smooth scroll for TOC links =====
+  tocLinks.forEach(function(l) {
+    l.addEventListener('click', function(e) {
+      e.preventDefault();
+      var id = l.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) {
+        window.scrollTo({ top: el.offsetTop - 20, behavior: 'smooth' });
+        history.replaceState(null, '', '#' + id);
+      }
+      // close mobile sidebar
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('visible');
+    });
+  });
+
+  // ===== Collapsible modules + sprints =====
+  // Modules: turn <h3> inside .module into clickable header
+  var modules = document.querySelectorAll('.module');
+  modules.forEach(function(m) {
+    var h3 = m.querySelector('h3');
+    if (!h3) return;
+    var head = document.createElement('button');
+    head.className = 'mod-head';
+    head.type = 'button';
+    head.setAttribute('aria-expanded', 'true');
+    // move h3 into button
+    var chev = document.createElement('span');
+    chev.className = 'chevron';
+    chev.textContent = '\u25BC';
+    head.appendChild(h3);
+    head.appendChild(chev);
+    m.insertBefore(head, m.firstChild);
+    // body = everything after head
+    var body = document.createElement('div');
+    body.className = 'mod-body';
+    var next = head.nextSibling;
+    while (next) {
+      var cur = next; next = next.nextSibling;
+      body.appendChild(cur);
+    }
+    m.appendChild(body);
+    head.addEventListener('click', function() {
+      m.classList.toggle('collapsed');
+      head.setAttribute('aria-expanded', m.classList.contains('collapsed') ? 'false' : 'true');
+    });
+  });
+
+  // Sprints: make .sprint-head clickable
+  var sprints = document.querySelectorAll('.sprint');
+  sprints.forEach(function(s) {
+    var head = s.querySelector('.sprint-head');
+    if (!head) return;
+    var chev = document.createElement('span');
+    chev.className = 'chevron';
+    chev.textContent = '\u25BC';
+    head.appendChild(chev);
+    head.setAttribute('role', 'button');
+    head.setAttribute('aria-expanded', 'true');
+    head.addEventListener('click', function() {
+      s.classList.toggle('collapsed');
+      head.setAttribute('aria-expanded', s.classList.contains('collapsed') ? 'false' : 'true');
+    });
+  });
+
+  // ===== Expand / Collapse all =====
+  var expandAll = document.getElementById('expandAll');
+  var collapseAll = document.getElementById('collapseAll');
+  expandAll.addEventListener('click', function() {
+    document.querySelectorAll('.module.collapsed, .sprint.collapsed').forEach(function(el) {
+      el.classList.remove('collapsed');
+      var h = el.querySelector('.mod-head, .sprint-head');
+      if (h) h.setAttribute('aria-expanded', 'true');
+    });
+  });
+  collapseAll.addEventListener('click', function() {
+    document.querySelectorAll('.module, .sprint').forEach(function(el) {
+      el.classList.add('collapsed');
+      var h = el.querySelector('.mod-head, .sprint-head');
+      if (h) h.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  // ===== Search / filter =====
+  var search = document.getElementById('search');
+  var searchClear = document.getElementById('searchClear');
+  var noResultsMsg = null;
+
+  // Build searchable index of table rows across all tables
+  var allTables = document.querySelectorAll('table');
+  var tableData = [];
+  allTables.forEach(function(tbl) {
+    var rows = tbl.querySelectorAll('tbody tr');
+    rows.forEach(function(r) {
+      tableData.push({
+        row: r,
+        text: r.textContent.toLowerCase().trim(),
+        table: tbl
+      });
+    });
+  });
+
+  // Also index modules + sprints for filtering their visibility
+  var moduleBlocks = document.querySelectorAll('.module');
+  var sprintBlocks = document.querySelectorAll('.sprint');
+
+  function filter(q) {
+    q = q.toLowerCase().trim();
+    if (!q) {
+      // show all
+      tableData.forEach(function(d) { d.row.classList.remove('hidden-row'); });
+      moduleBlocks.forEach(function(m) { m.style.display = ''; });
+      sprintBlocks.forEach(function(s) { s.style.display = ''; });
+      if (noResultsMsg) noResultsMsg.classList.remove('visible');
+      searchClear.classList.remove('visible');
+      return;
+    }
+    searchClear.classList.add('visible');
+
+    // Filter table rows
+    var anyRowVisible = false;
+    tableData.forEach(function(d) {
+      var match = d.text.indexOf(q) !== -1;
+      d.row.classList.toggle('hidden-row', !match);
+      if (match) anyRowVisible = true;
+    });
+
+    // Filter module blocks (match on h3 text + dl content)
+    var anyModuleVisible = false;
+    moduleBlocks.forEach(function(m) {
+      var txt = (m.querySelector('h3') ? m.querySelector('h3').textContent : '') + ' ' + (m.querySelector('dl') ? m.querySelector('dl').textContent : '');
+      var match = txt.toLowerCase().indexOf(q) !== -1;
+      m.style.display = match ? '' : 'none';
+      if (match) anyModuleVisible = true;
+      if (match && m.classList.contains('collapsed')) m.classList.remove('collapsed');
+    });
+
+    // Filter sprint blocks (match on sprint-title + sprint-body text)
+    var anySprintVisible = false;
+    sprintBlocks.forEach(function(s) {
+      var txt = s.textContent.toLowerCase();
+      var match = txt.indexOf(q) !== -1;
+      s.style.display = match ? '' : 'none';
+      if (match) anySprintVisible = true;
+      if (match && s.classList.contains('collapsed')) s.classList.remove('collapsed');
+    });
+
+    // Per-table no-results: hide tables with all rows hidden
+    allTables.forEach(function(tbl) {
+      var wrap = tbl.closest('.tbl-wrap');
+      if (!wrap) return;
+      var visible = tbl.querySelectorAll('tbody tr:not(.hidden-row)').length;
+      var visibleNonFilterable = !tbl.querySelector('tbody tr');
+      wrap.style.display = (visible > 0 || visibleNonFilterable) ? '' : 'none';
+    });
+
+    // Global no-results message
+    if (!anyRowVisible && !anyModuleVisible && !anySprintVisible && tableData.length > 0) {
+      if (!noResultsMsg) {
+        noResultsMsg = document.createElement('div');
+        noResultsMsg.className = 'no-results';
+        noResultsMsg.textContent = 'No results for "' + q + '"';
+        document.querySelector('.main').insertBefore(noResultsMsg, document.querySelector('.main').firstChild);
+      }
+      noResultsMsg.textContent = 'No results for "' + q + '"';
+      noResultsMsg.classList.add('visible');
+    } else if (noResultsMsg) {
+      noResultsMsg.classList.remove('visible');
+    }
+  }
+
+  var searchTimer = null;
+  search.addEventListener('input', function() {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() { filter(search.value); }, 120);
+  });
+  searchClear.addEventListener('click', function() {
+    search.value = '';
+    filter('');
+    search.focus();
+  });
+  // keyboard shortcut: / focuses search
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && document.activeElement !== search) {
+      e.preventDefault();
+      search.focus();
+    }
+    if (e.key === 'Escape' && document.activeElement === search) {
+      search.value = '';
+      filter('');
+      search.blur();
+    }
+  });
+
+  // ===== Mobile sidebar toggle =====
+  var sidebar = document.getElementById('sidebar');
+  var backdrop = document.getElementById('sidebarBackdrop');
+  var mobileToggle = document.getElementById('mobileToggle');
+  mobileToggle.addEventListener('click', function() {
+    sidebar.classList.toggle('open');
+    backdrop.classList.toggle('visible');
+  });
+  backdrop.addEventListener('click', function() {
+    sidebar.classList.remove('open');
+    backdrop.classList.remove('visible');
+  });
+
+  // ===== Back to top =====
+  var backTop = document.getElementById('backTop');
+  backTop.addEventListener('click', function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // ===== Restore collapsed state from URL hash on load =====
+  // If URL has a hash, scroll to it and expand that section if collapsed
+  window.addEventListener('load', function() {
+    if (location.hash) {
+      var el = document.getElementById(location.hash.slice(1));
+      if (el) {
+        // walk up: if inside collapsed module/sprint, expand it
+        var p = el.closest('.module.collapsed, .sprint.collapsed');
+        if (p) p.classList.remove('collapsed');
+        setTimeout(function() { window.scrollTo({ top: el.offsetTop - 20, behavior: 'smooth' }); }, 50);
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
+

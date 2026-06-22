@@ -1,0 +1,146 @@
+@startuml
+
+skinparam backgroundColor #FCFCFC
+skinparam actorBorderColor #8E44AD
+skinparam actorFontColor #8E44AD
+skinparam actorFontSize 14
+skinparam usecaseBorderColor #8E44AD
+skinparam usecaseFontColor #1A5676
+skinparam usecaseFontSize 12
+skinparam usecaseBackgroundColor #F4ECF7
+skinparam arrowColor #555555
+skinparam packageBackgroundColor #F0F5FA
+skinparam packageBorderColor #8E44AD
+skinparam packageFontStyle bold
+skinparam packageFontSize 13
+skinparam titleFontSize 16
+skinparam titleFontColor #8E44AD
+skinparam noteBackgroundColor #F4ECF7
+skinparam noteBorderColor #8E44AD
+
+left to right direction
+
+title **Nabdh Platform** — Admin & Super Admin Use Case Diagram
+
+actor "Admin\n(Operations)" as Admin
+actor "Super Admin\n(System)" as SuperAdmin
+
+rectangle "**Authentication**" {
+  usecase "Admin Login\n(Email/Password + 2FA)" as A1
+}
+
+rectangle "**Nurse Verification**" {
+  usecase "View Pending\nVerifications" as A2
+  usecase "Review Uploaded\nDocuments" as A3
+  usecase "Approve / Reject\nNurse Application" as A4
+}
+
+rectangle "**User Management**" {
+  usecase "Search / Filter\nAll Users" as A5
+  usecase "View User\nDetails" as A6
+  usecase "Suspend User\nAccount" as A7
+  usecase "Ban User" as A8
+}
+
+rectangle "**Booking Management**" {
+  usecase "View All Bookings\n(Filter by Status)" as A9
+  usecase "View Booking\nFull Details" as A10
+  usecase "Intervene in\nActive Booking" as A11
+}
+
+rectangle "**Financial Operations**" {
+  usecase "View Financial\nSummary" as A12
+  usecase "View All\nTransactions" as A13
+  usecase "View Wallet\nBalances" as A14
+  usecase "Monitor\nWithdrawals" as A15
+}
+
+rectangle "**Dispute Resolution**" {
+  usecase "Review Dispute\nDetails" as A16
+  usecase "Issue Refund\n(Deduct from Nurse)" as A17
+  usecase "Adjust Wallet\nBalance" as A18
+  usecase "Cancel Booking\nFor Cause" as A19
+}
+
+rectangle "**Service Management**" {
+  usecase "Create Service\nCategory" as A20
+  usecase "Edit Service\nCategory" as A21
+  usecase "Deactivate\nService" as A22
+}
+
+rectangle "**Reporting & Analytics**" {
+  usecase "View Real-Time\nDashboard" as A23
+  usecase "Generate Financial\nReports" as A24
+  usecase "Generate Operational\nReports" as A25
+  usecase "View Nurse\nPerformance Reports" as A26
+  usecase "View Patient\nSatisfaction Reports" as A27
+}
+
+rectangle "**System Management**" {
+  usecase "Configure\nCommission Rates" as A28
+  usecase "Broadcast Push\nNotifications" as A29
+  usecase "Manage FAQ\n& Content" as A30
+  usecase "View Audit\nLogs" as A31
+  usecase "Manage Other\nAdmins" as A32
+  usecase "Add Review\nComments" as A4_Reason
+  usecase "Deduct from\nNurse Wallet" as A17_Deduct
+}
+
+' ── ADMIN ASSOCIATIONS ──────────────────────────────────────
+Admin --> A1
+Admin --> A2
+Admin --> A3
+Admin --> A4
+Admin --> A5
+Admin --> A6
+Admin --> A7
+Admin --> A8
+Admin --> A9
+Admin --> A10
+Admin --> A11
+Admin --> A12
+Admin --> A13
+Admin --> A14
+Admin --> A15
+Admin --> A16
+Admin --> A17
+Admin --> A18
+Admin --> A19
+Admin --> A20
+Admin --> A21
+Admin --> A22
+Admin --> A23
+Admin --> A24
+Admin --> A25
+Admin --> A26
+Admin --> A27
+Admin --> A29
+Admin --> A30
+Admin --> A31
+
+' ── SUPER ADMIN ASSOCIATIONS ────────────────────────────────
+SuperAdmin --> A1
+SuperAdmin --> A28
+SuperAdmin --> A32
+SuperAdmin -up-|> Admin
+
+' ── INCLUDE / EXTEND ────────────────────────────────────────
+A4 ..> A4_Reason : <<extend>>
+A17 ..> A17_Deduct : <<include>>
+
+' ── NOTES ───────────────────────────────────────────────────
+note right of A4
+  SLA: 72 hours
+  48-hour nudge to admin
+end note
+
+note bottom of A17
+  Refund deducted from nurse
+  wallet. If insufficient,
+  negative adjustment tracked
+  against future earnings.
+  Platform does not absorb
+  dispute refunds.
+end note
+
+@enduml

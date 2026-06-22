@@ -21,6 +21,9 @@ export class User {
   @Prop({ enum: UserStatus, default: UserStatus.ACTIVE })
   status: UserStatus;
 
+  @Prop()
+  totpSecret?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,0 +1,246 @@
+@startuml
+skinparam backgroundColor #FCFCFC
+skinparam participantBorderColor #1A5676
+skinparam participantFontColor #1A5676
+skinparam participantFontSize 13
+skinparam sequenceActorBorderColor #1A5676
+skinparam sequenceActorFontColor #1A5676
+skinparam arrowColor #555555
+skinparam sequenceLifeLineBorderColor #2E86AB
+skinparam sequenceLifeLineBackgroundColor #E8F4F8
+skinparam sequenceBoxBorderColor #1A5676
+skinparam sequenceBoxFontColor #1A5676
+skinparam sequenceBoxBackgroundColor #F0F5FA
+skinparam noteBackgroundColor #FFFCE8
+skinparam noteBorderColor #D4A017
+
+title **Standard Booking Flow** — End-to-End Sequence Diagram
+
+actor "Patient" as PAT
+participant "Patient App" as PAPP
+participant "API Gateway" as GW
+participant "Booking\nService" as BKS
+participant "Location\nService" as LOC
+participant "Notification\nService" as NOT
+participant "Nurse App" as NAPP
+participant "Nurse" as NUR
+participant "Payment\nService" as PAY
+participant "Wallet\nService" as WAL
+
+== Request Creation ==
+
+PAT -> PAPP: Browse & Select Service
+PAPP -> PAPP: Show service categories
+PAT -> PAPP: Select service type
+PAT -> PAPP: Enter location & notes
+PAT -> PAPP: Optional: set gender preference
+PAT -> PAPP: Submit Request
+
+PAPP -> GW: POST /api/v1/requests
+GW -> BKS: Create ServiceRequest
+
+group Request Validation
+  BKS -> BKS: Validate service
+  BKS -> BKS: Check patient has no active booking
+  BKS -> BKS: Set status = PENDING_OFFERS
+  BKS -> LOC: Find nearby online nurses (15km)
+  LOC -> LOC: Haversine distance query
+  LOC --> BKS: List of matching nurse IDs
+end
+
+BKS --> PAPP: Request Created (status: PENDING_OFFERS)
+
+== Offer Broadcast ==
+
+loop For each matching nurse
+  BKS -> NOT: Send push "New Request Available"
+  NOT --> NAPP: Push notification
+  NAPP --> NUR: Display new request
+end
+
+PAT -> PAPP: Waiting for offers screen
+
+== Offer Submission ==
+
+NUR -> NAPP: Review request details
+NUR -> NAPP: Submit offer (price + ETA)
+NAPP -> GW: POST /api/v1/nurse/offers
+GW -> BKS: Create Offer
+
+BKS -> BKS: Store offer (status: PENDING)
+BKS -> BKS: Sort offers by relevance score
+BKS -> NOT: Send push "New Offer Received"
+NOT --> PAPP: Real-time offer update
+PAPP --> PAT: Display offer in list
+
+note right #FFFCE8
+  Offer ranking formula:
+  score = rating * 0.4
+        + (1/price_norm) * 0.3
+        + (1/eta_norm) * 0.3
+  Patient can re-sort by
+  price / rating / ETA
+end note
+
+== Nurse Selection ==
+
+PAT -> PAPP: View offer list
+PAT -> PAPP: Tap offer → view nurse profile
+PAT -> PAPP: Select and confirm nurse
+
+PAPP -> GW: POST /api/v1/requests/{id}/select-offer
+GW -> BKS: Process selection
+
+BKS -> BKS: Set offer status = ACCEPTED
+BKS -> BKS: Decline all other offers
+BKS -> BKS: Create Booking (status: NURSE_SELECTED)
+
+BKS -> NOT: Push "You've been selected!" to chosen nurse
+BKS -> NOT: Push "Offer declined" to other nurses
+
+NOT --> NAPP: Selected nurse gets confirmation request
+NOT --> NAPP: Other nurses get decline notice
+
+== Nurse Confirmation ==
+
+NUR -> NAPP: Confirm assignment
+NAPP -> GW: POST /api/v1/nurse/bookings/{id}/confirm
+GW -> BKS: Confirm booking
+
+BKS -> BKS: Set Booking status = NURSE_CONFIRMED
+BKS -> NOT: Push "Booking Confirmed" to both parties
+
+NOT --> NAPP: Confirmation
+NOT --> PAPP: Confirmation
+PAPP --> PAT: "Booking Confirmed — Nurse on the way"
+
+== En Route & Tracking ==
+
+NUR -> NAPP: Tap "Start Navigation"
+NAPP -> GW: PUT booking status = EN_ROUTE
+GW -> BKS: Update status
+
+BKS -> BKS: Set en_route_at timestamp
+BKS -> NOT: Push "Nurse En Route"
+
+NOT --> PAPP: Patient notified
+PAPP --> PAT: Live tracking screen activates
+PAT -> PAPP: Watch nurse location on map
+
+loop Every 5 seconds
+  NAPP -> GW: WebSocket: location update (lat, lng)
+  GW -> LOC: Update nurse location
+  LOC --> PAPP: WebSocket: nurse position + ETA
+  PAPP -> PAPP: Update map marker & ETA countdown
+end
+
+note right #FFFCE8
+  SOS location interval: 3 sec
+  Standard: 5 sec
+  Idle: 30 sec
+end note
+
+== Arrival & Visit ==
+
+NUR -> NAPP: Tap "Arrived"
+NAPP -> GW: PUT booking status = ARRIVED
+GW -> BKS: Update status
+
+BKS -> BKS: Set arrived_at timestamp
+BKS -> NOT: Push "Nurse has arrived"
+NOT --> PAPP: Patient notified
+
+NUR -> NAPP: Tap "Start Visit"
+NAPP -> GW: PUT booking status = VISIT_STARTED
+GW -> BKS: Update status
+BKS -> BKS: Set visit_started_at timestamp
+
+note right #FFFCE8
+  Visit in progress
+  Chat available during visit
+end note
+
+NUR -> NAPP: Tap "Complete Visit"
+NAPP -> GW: PUT booking status = VISIT_COMPLETED
+GW -> BKS: Update status
+
+BKS -> BKS: Set visit_completed_at timestamp
+BKS -> NOT: Push "Visit Completed"
+
+== Payment ==
+
+PAPP --> PAT: Payment screen (select method)
+
+alt Cash Payment
+  PAT -> PAPP: Select Cash
+  PAPP -> GW: Mark payment method = CASH
+  GW -> PAY: Record cash transaction
+  PAY --> WAL: Record commission owed
+  note right #FFFCE8
+    Commission deducted from
+    nurse prepaid balance
+  end note
+
+alt Card Payment (Paymob)
+  PAT -> PAPP: Select Card
+  PAPP -> GW: POST /api/v1/payments/initiate
+  GW -> PAY: Create payment intent
+  PAY --> PAPP: Payment form (iframe/SDK)
+  PAT -> PAY: Enter card details
+  PAY --> PAT: Payment processed
+  PAY -> GW: Webhook: payment success
+  GW -> BKS: Mark payment received
+
+alt Fawry Payment
+  PAT -> PAPP: Select Fawry
+  PAPP -> GW: Request Fawry reference
+  GW -> PAY: Create Fawry order
+  PAY --> PAPP: Display reference number
+  PAT -> Fawry: Pay at Fawry outlet / app
+  Fawry -> PAY: Webhook: payment success
+  PAY -> GW: Mark payment confirmed
+end
+
+GW -> BKS: Payment received
+BKS -> BKS: Set status = PAYMENT_COMPLETED
+
+== Commission & Wallet Credit ==
+
+BKS -> WAL: Calculate commission (15-20%)
+WAL -> WAL: Deduct commission
+WAL -> WAL: Credit nurse wallet (amount - commission)
+WAL -> WAL: Record double-entry ledger
+
+WAL --> BKS: Wallet credited
+BKS -> NOT: Push "Payment Received" to nurse
+NOT --> NAPP: Nurse notified
+
+== Rating ==
+
+PAPP --> PAT: Rate Nurse (1-5 stars + optional review)
+PAT -> PAPP: Submit rating
+PAPP -> GW: POST /api/v1/bookings/{id}/rate
+GW -> BKS: Save rating
+
+BKS -> BKS: Update nurse avg_rating
+BKS --> PAPP: Rating saved
+
+NAPP --> NUR: Rate Patient (1-5 stars)
+NUR -> NAPP: Submit rating
+NAPP -> GW: POST /api/v1/nurse/bookings/{id}/rate
+GW -> BKS: Save patient rating
+
+BKS -> BKS: Set status = RATED → CLOSED
+
+== Completion ==
+
+PAPP --> PAT: "Booking Complete"
+NAPP --> NUR: "Visit Complete + Earnings Updated"
+
+note right #FFFCE8
+  Booking lifecycle complete.
+  Auto-closes after 72h
+  if no rating submitted.
+end note
+
+@enduml

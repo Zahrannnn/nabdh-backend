@@ -1,0 +1,199 @@
+@startuml
+skinparam backgroundColor #FCFCFC
+skinparam participantBorderColor #27AE60
+skinparam participantFontColor #27AE60
+skinparam participantFontSize 13
+skinparam sequenceActorBorderColor #27AE60
+skinparam sequenceActorFontColor #27AE60
+skinparam arrowColor #555555
+skinparam sequenceLifeLineBorderColor #27AE60
+skinparam sequenceLifeLineBackgroundColor #EAFAF1
+skinparam sequenceBoxBorderColor #27AE60
+skinparam sequenceBoxFontColor #27AE60
+skinparam sequenceBoxBackgroundColor #EAFAF1
+skinparam noteBackgroundColor #EAFAF1
+skinparam noteBorderColor #27AE60
+
+title **Nurse Onboarding & Verification** — Sequence Diagram
+
+actor "Nurse\n(ممرض / ممرضة)" as NUR
+participant "Nurse App" as NAPP
+participant "API Gateway" as GW
+participant "User\nService" as USR
+participant "Document\nService" as DOC
+participant "Notification\nService" as NOT
+actor "Admin" as ADM
+participant "Admin Panel" as ADMP
+
+== Registration ==
+
+NUR -> NAPP: Open app & tap Register
+NAPP -> NAPP: Show registration form
+NUR -> NAPP: Enter phone number
+
+NAPP -> GW: POST /api/v1/auth/otp/send
+GW -> USR: Send OTP
+
+USR -> USR: Generate 6-digit OTP
+USR -> USR: Store with expiry (5 min)
+USR -> NOT: Send SMS with OTP
+NOT --> NAPP: OTP delivered via SMS
+
+NUR -> NAPP: Enter OTP code
+NAPP -> GW: POST /api/v1/auth/otp/verify
+GW -> USR: Verify OTP
+USR -> USR: Validate OTP + check expiry
+
+alt OTP Valid
+  USR -> USR: Create User (type = NURSE)
+  USR -> USR: Create Nurse profile (status: INCOMPLETE)
+  USR --> GW: JWT access + refresh tokens
+  GW --> NAPP: Tokens + profile
+  NAPP --> NUR: Registration successful — proceed to documents
+else OTP Invalid
+  USR --> GW: Error: Invalid/expired OTP
+  GW --> NAPP: Show error
+  NAPP --> NUR: "Code incorrect, please try again"
+end
+
+== Document Upload ==
+
+note right #EAFAF1
+  Required documents:
+  1. National ID (صورة البطاقة)
+  2. Nursing License (ترخيص تمريض)
+  3. Profile Photo (صورة شخصية)
+end note
+
+NUR -> NAPP: Upload National ID photo
+NAPP -> GW: POST /api/v1/nurse/documents
+GW -> DOC: Upload and store document
+DOC -> DOC: Validate file type & size (< 10MB)
+DOC -> DOC: Store in S3/Minio
+DOC --> GW: Document URL
+GW --> NAPP: Document uploaded (status: PENDING)
+
+NUR -> NAPP: Upload Nursing License photo
+NAPP -> GW: POST /api/v1/nurse/documents
+GW -> DOC: Same upload flow
+DOC --> GW: Document stored
+GW --> NAPP: Document uploaded (status: PENDING)
+
+NUR -> NAPP: Upload Profile Photo
+NAPP -> GW: POST /api/v1/nurse/documents
+GW -> DOC: Same upload flow
+DOC --> GW: Document stored
+GW --> NAPP: Document uploaded (status: PENDING)
+
+== Profile Completion ==
+
+NUR -> NAPP: Fill profile details
+NAPP -> NAPP: Name, gender, bio, experience, specializations
+NUR -> NAPP: Submit profile
+
+NAPP -> GW: PUT /api/v1/nurse/profile
+GW -> USR: Update nurse profile
+USR -> USR: Set verification_status = PENDING
+USR -> USR: Activate nurse (limited — cannot go online)
+USR --> GW: Profile updated
+GW --> NAPP: "Documents submitted for review"
+
+NAPP --> NUR: "Your application is being reviewed (SLA: 72 hours)"
+
+== Admin Notification ==
+
+USR -> NOT: Alert admin — new nurse pending verification
+NOT -> ADMP: Push + In-app notification
+ADMP --> ADM: "New nurse verification pending"
+
+== Verification Review ==
+
+note right #EAFAF1
+  SLA: 72 hours (3 business days)
+  48-hour nudge alert to admin
+end note
+
+ADM -> ADMP: Log in to Admin Panel
+ADMP -> ADMP: View pending verifications queue
+ADM -> ADMP: Select nurse application
+ADMP -> ADMP: Display all uploaded documents side-by-side
+
+ADM -> ADMP: Review National ID
+ADM -> ADMP: Review Nursing License
+note right #EAFAF1
+  Admin checks:
+  - License validity & expiry
+  - Name matches National ID
+  - Photo matches applicant
+  - License number legitimacy
+end note
+
+alt Approve
+  ADM -> ADMP: Tap "Approve"
+  ADMP -> GW: POST /api/v1/admin/nurses/{id}/verify
+  GW -> USR: Approve nurse
+
+  USR -> USR: Set verification_status = APPROVED
+  USR -> USR: Set verified_at = now
+  USR -> USR: Store license_expiry_date
+  USR -> USR: Mark nurse as ready to go online
+  USR -> NOT: Push "Verification Approved"
+  NOT --> NAPP: "Congratulations! You are now verified ✓"
+  NAPP --> NUR: "Your account is now active. You can go online!"
+
+  USR -> USR: Log audit: Nurse approved by {admin_id}
+
+else Reject
+  ADM -> ADMP: Tap "Reject"
+  ADMP -> ADMP: Enter rejection reason (required)
+  ADMP -> GW: POST /api/v1/admin/nurses/{id}/verify
+  GW -> USR: Reject nurse
+
+  USR -> USR: Set verification_status = REJECTED
+  USR -> USR: Store rejection_reason
+  USR -> NOT: Push "Verification Rejected"
+  NOT --> NAPP: "Your application was not approved: {reason}"
+  NAPP --> NUR: "Please correct and re-submit documents"
+
+  USR -> USR: Log audit: Nurse rejected by {admin_id}
+end
+
+== Post-Verification (License Expiry Monitoring) ==
+
+note right #EAFAF1
+  License expiry tracking
+  - 30 days before: warning notification
+  - 7 days before: urgent warning
+  - On expiry date: auto-set offline
+  - Nurse must re-upload renewed license
+end note
+
+group License Expiry Watchdog
+  USR -> USR: Daily cron: check license_expiry_date
+  USR -> USR: If expiry in 30 days → send warning
+  USR -> NOT: Push "License expires in 30 days"
+  NOT --> NAPP: Show warning
+
+  USR -> USR: If expiry in 7 days → send urgent warning
+  USR -> NOT: Push "License expires in 7 days — renew now"
+  NOT --> NAPP: Show urgent warning
+
+  USR -> USR: If expiry date reached
+  USR -> USR: Set is_online = false
+  USR -> USR: Block nurse from toggling online
+  USR -> NOT: Push "License expired — account deactivated"
+  NOT --> NAPP: "Your license has expired. Upload renewed license."
+end
+
+== Re-Verification Cycle ==
+
+NUR -> NAPP: Upload renewed license document
+NAPP -> GW: POST /api/v1/nurse/documents
+GW -> DOC: Store new document
+DOC --> GW: Document stored
+GW -> USR: Flag for admin re-review
+USR -> NOT: Alert admin
+NOT --> ADMP: "Nurse re-uploaded license for review"
+ADM -> ADMP: Review and approve (same flow as above)
+
+@enduml

@@ -1,0 +1,139 @@
+@startuml
+skinparam backgroundColor #FCFCFC
+skinparam participantBorderColor #D4A017
+skinparam participantFontColor #D4A017
+skinparam participantFontSize 13
+skinparam sequenceActorBorderColor #D4A017
+skinparam sequenceActorFontColor #D4A017
+skinparam arrowColor #555555
+skinparam sequenceLifeLineBorderColor #D4A017
+skinparam sequenceLifeLineBackgroundColor #FFFCE8
+skinparam sequenceBoxBorderColor #D4A017
+skinparam sequenceBoxFontColor #D4A017
+skinparam sequenceBoxBackgroundColor #FFFCE8
+skinparam noteBackgroundColor #FFFCE8
+skinparam noteBorderColor #D4A017
+
+title **Nurse Cancellation & Reassignment** — Sequence Diagram
+
+actor "Patient" as PAT
+participant "Patient App" as PAPP
+participant "API Gateway" as GW
+participant "Booking\nService" as BKS
+participant "Notification\nService" as NOT
+actor "Nurse" as NUR
+participant "Nurse App" as NAPP
+participant "Admin Panel" as ADMP
+
+== Pre-Condition: Active Booking ==
+
+note right #FFFCE8
+  Booking state before cancellation:
+  status ∈ {NURSE_CONFIRMED, EN_ROUTE, ARRIVED}
+end note
+
+== Nurse Initiates Cancellation ==
+
+NUR -> NAPP: Tap "Cancel Booking"
+NAPP -> NAPP: Show cancellation reason selection
+
+note right #FFFCE8
+  Required reason selection:
+  1. طارئ شخصي (Personal emergency)
+  2. المسافة أبعد من المتوقع
+     (Location too far)
+  3. الخدمة خارج تخصصي
+     (Outside my specialization)
+  4. مشكلة في المواصلات
+     (Transportation issue)
+  5. أخرى (Other — free text)
+end note
+
+NUR -> NAPP: Select reason + confirm
+NAPP -> GW: POST /api/v1/nurse/bookings/{id}/cancel
+GW -> BKS: Process cancellation
+
+BKS -> BKS: Validate booking is cancellable by nurse
+BKS -> BKS: Set status = CANCELLED_BY_NURSE
+BKS -> BKS: Store cancellation_reason
+BKS -> BKS: Store cancelled_by = nurse_id
+BKS -> BKS: Set cancelled_at = now
+BKS -> BKS: Increment nurse cancellation counter
+
+== Patient Notification ==
+
+BKS -> NOT: Push "Your nurse has cancelled"
+NOT -> NOT: Urgent push notification
+
+NOT --> PAPP: "Nurse cancelled — finding new provider"
+PAPP --> PAT: Show cancellation alert + "Finding alternatives..."
+
+== Reassignment Flow ==
+
+BKS -> BKS: Check original ServiceRequest
+BKS -> BKS: Reset request to PENDING_OFFERS
+BKS -> BKS: Exclude cancelling nurse from new broadcast
+
+BKS -> LOC: Find nearby nurses (excluding canceller)
+LOC --> BKS: List of available nurses
+
+loop For each available nurse
+  BKS -> NOT: Send push "New Request Available"
+  NOT --> NAPP: Re-broadcast to new nurses
+end
+
+== New Offers Cycle ==
+
+PAPP --> PAT: "New offers are coming in..."
+
+NUR2 -> BKS: Submit new offer
+BKS --> PAPP: Real-time: New offer received
+PAPP --> PAT: Display new offers list
+
+PAT -> PAPP: Select new nurse
+PAPP -> GW: POST /api/v1/requests/{id}/select-offer
+GW -> BKS: Assign new nurse
+
+== Alternate Paths ==
+
+alt No Nurses Available
+  BKS -> BKS: Timeout — no offers received
+  BKS -> NOT: Push "No nurses available"
+  NOT --> PAPP: "No nurses available in your area"
+  PAPP --> PAT: Options: Cancel or Retry
+
+  alt Patient Cancels
+    PAT -> PAPP: Cancel request
+    PAPP -> GW: POST /api/v1/requests/{id}/cancel
+    GW -> BKS: Cancel request
+    BKS -> BKS: Set status = CANCELLED_BY_PATIENT
+    BKS -> NOT: Notify admin of cancellation cascade
+    NOT --> ADMP: "Booking cancelled — no replacement found"
+  end
+end
+
+== Admin Monitoring ==
+
+BKS -> ADMP: Log cancellation with full audit trail
+ADMP -> ADMP: Update nurse cancellation statistics
+
+note right #FFFCE8
+  Quality tracking:
+  - Cancellation rate tracked per nurse
+  - If rate > 15%, admin alerted
+  - Flagged for potential deactivation
+end note
+
+== Audit Trail ==
+
+BKS -> BKS: Log audit entry
+note right #FFFCE8
+  Audit log captures:
+  - Original nurse ID
+  - Cancellation reason
+  - Timestamp of cancellation
+  - New assignment (if any)
+  - Time to reassignment
+end note
+
+@enduml

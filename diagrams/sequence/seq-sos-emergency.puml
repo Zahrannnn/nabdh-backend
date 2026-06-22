@@ -1,0 +1,160 @@
+@startuml
+skinparam backgroundColor #FCFCFC
+skinparam participantBorderColor #C0392B
+skinparam participantFontColor #C0392B
+skinparam participantFontSize 13
+skinparam sequenceActorBorderColor #C0392B
+skinparam sequenceActorFontColor #C0392B
+skinparam arrowColor #555555
+skinparam sequenceLifeLineBorderColor #E74C3C
+skinparam sequenceLifeLineBackgroundColor #FDEDEC
+skinparam sequenceBoxBorderColor #C0392B
+skinparam sequenceBoxFontColor #C0392B
+skinparam sequenceBoxBackgroundColor #FDEDEC
+skinparam noteBackgroundColor #FDEDEC
+skinparam noteBorderColor #E74C3C
+
+title **SOS Emergency Flow** — Sequence Diagram
+
+actor "Patient" as PAT
+participant "Patient App" as PAPP
+participant "API Gateway" as GW
+participant "Booking\nService" as BKS
+participant "Location\nService" as LOC
+participant "Notification\nService" as NOT
+participant "Nurse 1" as N1
+participant "Nurse 2" as N2
+participant "Nurse N" as N3
+participant "Admin Panel" as ADM
+participant "Payment\nService" as PAY
+participant "Wallet\nService" as WAL
+
+== SOS Trigger ==
+
+PAT -> PAPP: Tap SOS emergency button
+PAPP -> PAPP: Show confirmation dialog
+note right #FDEDEC
+  "هل أنت متأكد من طلب مساعدة طارئة؟"
+  Optional: free-text description
+  (max 300 chars)
+end note
+
+PAT -> PAPP: Confirm SOS
+PAPP -> PAPP: Rate limit check (1 per 15 min)
+
+PAPP -> GW: POST /api/v1/requests/sos
+GW -> BKS: Create SOS Request
+
+BKS -> BKS: Validate patient has no active SOS
+BKS -> BKS: Set type = EMERGENCY
+BKS -> BKS: Set status = PENDING_OFFERS
+BKS -> BKS: Set platform price = 1.5x avg market price
+BKS -> LOC: Find nearby nurses (20km radius)
+
+LOC -> LOC: Haversine query (20km, expandable to 30km)
+LOC --> BKS: List of online, verified nurses
+
+BKS -> BKS: Respect gender preference if set
+
+== Admin Alert ==
+
+BKS -> ADM: Real-time SOS alert (dedicated monitor)
+ADM -> ADM: SOS dashboard updates
+
+== Urgent Broadcast ==
+
+loop For each matching nurse
+  BKS -> NOT: Send CRITICAL push "SOS Emergency!"
+  NOT -> NOT: High-priority notification + distinct sound
+  NOT --> N1: Urgent notification
+  NOT --> N2: Urgent notification
+  NOT --> N3: Urgent notification
+end
+
+PAPP --> PAT: "Finding emergency nurse..." (pulsing animation)
+PAPP -> PAPP: 2-minute countdown
+
+== First-Accept Dispatch ==
+
+note right #FDEDEC
+  SOS matching: FIRST ACCEPT WINS
+  No bidding, no price negotiation
+  Platform sets the price
+end note
+
+N1 -> N1: One-tap Accept
+N1 -> BKS: Accept SOS (via WebSocket/REST)
+BKS -> BKS: Lock request — assign Nurse 1
+BKS -> BKS: Create Booking (status: NURSE_CONFIRMED)
+BKS -> BKS: SOS assigned timestamp
+
+BKS -> ADM: SOS Assigned to Nurse 1
+ADM -> ADM: Update SOS monitor
+
+par Urgent Dispatch
+  BKS -> NOT: Push "SOS Assigned" to patient
+  NOT --> PAPP: "Nurse assigned — your emergency nurse is on the way"
+  PAPP --> PAT: Nurse name, rating, ETA displayed
+  PAPP -> PAPP: Pulsing animation stops
+end
+
+BKS -> NOT: Send "SOS Already Assigned" to remaining nurses
+NOT --> N2: SOS assigned to another nurse
+NOT --> N3: SOS assigned to another nurse
+
+== SOS Timeout Handling ==
+
+note right #FDEDEC
+  If no nurse accepts within 2 min:
+  - Patient notified
+  - Option to retry or call emergency services
+  - Admin alerted
+end note
+
+== Rapid Dispatch & Tracking ==
+
+N1 -> N1: Begin navigation immediately
+
+loop Every 3 seconds
+  N1 -> LOC: Location update (lat, lng, speed)
+  LOC --> PAPP: Real-time position + ETA
+  PAPP -> PAPP: Update map (3-second refresh)
+end
+
+== Arrival & Visit ==
+
+N1 -> BKS: Mark Arrived
+N1 -> BKS: Mark Visit Started
+N1 -> BKS: Mark Visit Completed
+
+== Payment ==
+
+BKS -> PAY: Trigger payment flow
+PAY -> PAY: Process SOS payment (platform price)
+
+alt Cash
+  PAT -> PAPP: Pay cash to nurse on-site
+  PAPP -> PAY: Record cash SOS payment
+  PAY -> WAL: Debit commission from prepaid balance
+
+alt Card / Fawry
+  PAT -> PAPP: Select in-app payment
+  PAPP -> PAY: Process payment
+  PAY -> PAY: Payment webhook received
+  PAY -> WAL: Credit nurse (platform price - commission)
+end
+
+== Post-Visit ==
+
+PAT -> PAPP: Rate Nurse
+N1 -> N1: Rate Patient
+
+BKS -> ADM: SOS Completed — Summary
+ADM -> ADM: Log SOS response metrics
+
+note right #FDEDEC
+  SOS completion rate target: > 95%
+  SOS acceptance time target: < 60 sec
+end note
+
+@enduml

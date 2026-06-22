@@ -1,0 +1,170 @@
+@startuml
+skinparam backgroundColor #FCFCFC
+skinparam participantBorderColor #2980B9
+skinparam participantFontColor #2980B9
+skinparam participantFontSize 13
+skinparam sequenceActorBorderColor #2980B9
+skinparam sequenceActorFontColor #2980B9
+skinparam arrowColor #555555
+skinparam sequenceLifeLineBorderColor #2980B9
+skinparam sequenceLifeLineBackgroundColor #EBF5FB
+skinparam sequenceBoxBorderColor #2980B9
+skinparam sequenceBoxFontColor #2980B9
+skinparam sequenceBoxBackgroundColor #EBF5FB
+skinparam noteBackgroundColor #EBF5FB
+skinparam noteBorderColor #2980B9
+
+title **Scheduled Booking Flow** — Sequence Diagram
+
+actor "Patient" as PAT
+participant "Patient App" as PAPP
+participant "API Gateway" as GW
+participant "Booking\nService" as BKS
+participant "Scheduler\n(Cron/Worker)" as SCH
+participant "Notification\nService" as NOT
+participant "Nurse App" as NAPP
+actor "Nurse" as NUR
+
+== Patient Creates Scheduled Request ==
+
+PAT -> PAPP: Browse services → Select service
+PAT -> PAPP: Select "Schedule for later"
+
+note right #EBF5FB
+  Scheduling rules:
+  - Min: 2 hours from now
+  - Max: 7 days from now
+  - Patient picks date + time
+end note
+
+PAT -> PAPP: Pick future date & time
+PAT -> PAPP: Enter location & notes
+PAT -> PAPP: Optional: set gender preference
+PAT -> PAPP: Submit scheduled request
+
+PAPP -> GW: POST /api/v1/requests (type = SCHEDULED)
+GW -> BKS: Create scheduled ServiceRequest
+
+BKS -> BKS: Validate scheduled_for is within range
+BKS -> BKS: Validate scheduled_for >= now + 2 hours
+BKS -> BKS: Validate scheduled_for <= now + 7 days
+BKS -> BKS: Set status = SCHEDULED_PENDING
+BKS -> BKS: Set broadcast_at = scheduled_for - 30 minutes
+BKS -> BKS: Store in database with scheduled_for timestamp
+
+BKS --> PAPP: Request created — "Booking scheduled ✓"
+PAPP --> PAT: Confirmation with scheduled date/time
+PAPP -> PAPP: Show in "Upcoming Bookings" list
+
+== Waiting Period ==
+
+note right #EBF5FB
+  Request is dormant during waiting period
+  - Visible in patient's "Scheduled" tab
+  - Patient can cancel for free up to 1 hour before
+  - Admin can view all scheduled bookings
+end note
+
+PAT -> PAPP: View upcoming scheduled bookings
+PAPP --> PAT: List of scheduled requests with countdown
+
+alt Patient cancels (≥ 1 hour before)
+  PAT -> PAPP: Cancel scheduled booking
+  PAPP -> GW: POST /api/v1/requests/{id}/cancel
+  GW -> BKS: Cancel scheduled request
+  BKS -> BKS: Set status = CANCELLED_BY_PATIENT
+  BKS --> PAPP: Cancelled (no charge)
+  PAPP --> PAT: "Scheduled booking cancelled"
+end
+
+== Scheduler Trigger ==
+
+note right #EBF5FB
+  Cron job runs every minute
+  Checks: broadcast_at <= now
+  AND status = SCHEDULED_PENDING
+end note
+
+SCH -> BKS: Query SCHEDULED_PENDING requests
+BKS --> SCH: List of requests ready to broadcast
+
+loop For each due request
+  SCH -> BKS: Trigger broadcast for request {id}
+  BKS -> BKS: Set status = PENDING_OFFERS
+  BKS -> BKS: Set broadcast_at = now
+
+  == Standard Offer Flow ==
+  BKS -> LOC: Find nearby online nurses
+  LOC --> BKS: Matching nurses list
+
+  loop For each matching nurse
+    BKS -> NOT: Push "New Request Available"
+    NOT --> NAPP:  "طلب تمريض جديد — خدمة مجدولة"
+    NAPP --> NUR: Display request
+  end
+
+  NUR -> NAPP: Submit offer
+  NAPP -> GW: POST /api/v1/nurse/offers
+  GW -> BKS: Create Offer
+
+  BKS --> PAPP: Real-time notification
+  PAPP --> PAT: "Offers are coming in for your scheduled booking"
+
+  PAT -> PAPP: View & select offer
+  PAPP -> GW: POST /api/v1/requests/{id}/select-offer
+  GW -> BKS: Confirm selection
+end
+
+== Booking Confirmation ==
+
+BKS -> BKS: Create Booking (status: NURSE_SELECTED)
+
+NUR -> NAPP: Confirm assignment
+NAPP -> GW: POST booking confirm
+GW -> BKS: Set status = NURSE_CONFIRMED
+
+BKS -> NOT: Push confirmation to both
+NOT --> PAPP: "Your scheduled nurse is confirmed ✓"
+PAPP --> PAT: Booking confirmed — nurse will arrive at scheduled time
+NOT --> NAPP: "Booking confirmed — arrive by {scheduled_time}"
+
+== Pre-Visit Reminder ==
+
+note right #EBF5FB
+  15 minutes before scheduled time:
+  - Patient gets reminder push
+  - Nurse gets reminder push
+  - Nurse can start navigation early
+end note
+
+SCH -> BKS: Check bookings due in 15 min
+BKS -> NOT: Push "Reminder: Nurse arriving soon"
+NOT --> PAPP: "Your nurse will arrive soon ✓"
+BKS -> NOT: Push "Reminder: Scheduled visit starting"
+NOT --> NAPP: "Reminder: You have a scheduled visit"
+
+== Visit Execution ==
+
+note right #EBF5FB
+  Same flow as standard booking from here:
+  Nurse navigates → arrives → visit → payment → rating
+end note
+
+NUR -> NAPP: Start navigation
+NAPP -> GW: PUT status = EN_ROUTE
+GW -> BKS: Update
+BKS -> NOT: Push "Nurse en route"
+NOT --> PAPP: Live tracking activated
+
+== Standard visit execution continues... ==
+
+NUR -> NAPP: Complete visit
+NAPP -> GW: PUT status = VISIT_COMPLETED
+GW -> BKS: Update
+
+PAT -> PAPP: Rate nurse
+NUR -> NAPP: Rate patient
+
+BKS -> BKS: Set status = CLOSED
+
+@enduml
