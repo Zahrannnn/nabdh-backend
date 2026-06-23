@@ -6,14 +6,8 @@ export class CreatePatientDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100, { message: 'firstName must not exceed 100 characters' })
-  firstName: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100, { message: 'lastName must not exceed 100 characters' })
-  lastName: string;
+  @MaxLength(200, { message: 'fullName must not exceed 200 characters' })
+  fullName: string;
 
   @ApiPropertyOptional({ enum: Gender })
   @IsOptional()

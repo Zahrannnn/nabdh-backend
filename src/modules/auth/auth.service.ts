@@ -13,7 +13,6 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Error as MongooseError, Model } from 'mongoose';
 import { User, UserDocument } from '../users/schemas/user.schema';
-import { Patient, PatientDocument } from '../users/schemas/patient.schema';
 import { Nurse, NurseDocument } from '../users/schemas/nurse.schema';
 import { OtpSession, OtpSessionDocument } from './schemas/otp-session.schema';
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
@@ -31,7 +30,6 @@ export class AuthService {
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(OtpSession.name) private readonly otpSessionModel: Model<OtpSessionDocument>,
     @InjectModel(RefreshToken.name) private readonly refreshTokenModel: Model<RefreshTokenDocument>,
-    @InjectModel(Patient.name) private readonly patientModel: Model<PatientDocument>,
     @InjectModel(Nurse.name) private readonly nurseModel: Model<NurseDocument>,
     private readonly otpService: OtpService,
     private readonly tokenService: TokenService,
@@ -118,21 +116,7 @@ export class AuthService {
           type: dto.role,
           status: UserStatus.ACTIVE,
         });
-        if (dto.role === UserType.PATIENT) {
-          await this.patientModel.create({
-            userId: user._id,
-            fullName: '',
-          });
-        } else if (dto.role === UserType.NURSE) {
-          await this.nurseModel.create({
-            userId: user._id,
-            fullName: '',
-            licenseNumber: `PENDING-${user._id.toString()}`,
-            licenseExpiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-            verificationStatus: VerificationStatus.INCOMPLETE,
-          });
-          nurseStatus = VerificationStatus.INCOMPLETE;
-        }
+
         this.logger.log(`AUDIT: USER_REGISTERED userId=${user._id} type=${user.type}`);
       }
 

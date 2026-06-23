@@ -10,7 +10,7 @@ export class Patient {
   @Prop({ required: true, type: Types.ObjectId, ref: 'User', unique: true, index: true })
   userId: Types.ObjectId;
 
-  @Prop({ default: '' })
+  @Prop({ required: true })
   fullName: string;
 
   @Prop({ enum: Gender })

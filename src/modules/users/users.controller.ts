@@ -1,24 +1,33 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Put } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreatePatientDto } from './dto';
+import { CreatePatientDto, UpdatePatientDto } from './dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Users')
 @ApiBearerAuth()
 @Controller()
+@UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post('patient/profile')
-  @ApiOperation({ summary: 'Create or update patient profile' })
-  async createPatientProfile(@Body() dto: CreatePatientDto) {
-    return this.usersService.createPatientProfile(dto);
+  @ApiOperation({ summary: 'Create patient profile' })
+  async createPatientProfile(@CurrentUser() currentUser: any, @Body() dto: CreatePatientDto) {
+    return this.usersService.createPatientProfile(currentUser, dto);
   }
 
   @Get('patient/profile')
   @ApiOperation({ summary: 'Get patient profile' })
-  async getPatientProfile() {
-    return this.usersService.getPatientProfile();
+  async getPatientProfile(@CurrentUser() currentUser: any) {
+    return this.usersService.getPatientProfile(currentUser);
+  }
+
+  @Put('patient/profile')
+  @ApiOperation({ summary: 'Update patient profile' })
+  async updatePatientProfile(@CurrentUser() currentUser: any, @Body() dto: UpdatePatientDto) {
+    return this.usersService.updatePatientProfile(currentUser, dto);
   }
 
   @Get('nurse/profile')

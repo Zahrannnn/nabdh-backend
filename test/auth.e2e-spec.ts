@@ -21,7 +21,7 @@ import { MongooseModule, getModelToken } from '@nestjs/mongoose';
 import { APP_GUARD, APP_FILTER } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 
 import { AuthModule } from '../src/modules/auth/auth.module';
