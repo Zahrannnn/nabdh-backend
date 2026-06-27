@@ -7,16 +7,29 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { CreatePatientDto, UpdatePatientDto } from './dto';
+import {
+  CreatePatientDto,
+  UpdatePatientDto,
+  CreateAddressDto,
+  CreateNurseDto,
+  UpdateNurseDto,
+} from './dto';
 import { User, UserDocument } from './schemas/user.schema';
 import { Patient, PatientDocument } from './schemas/patient.schema';
-import { UserType } from '../../common/enums';
+import { UserType, VerificationStatus } from '../../common/enums';
+import { Address, AddressDocument } from './schemas/address.schema';
+import { Nurse, NurseDocument } from './schemas/nurse.schema';
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
     @InjectModel(Patient.name)
     private readonly patientModel: Model<PatientDocument>,
+    @InjectModel(Address.name)
+    private readonly addressModel: Model<AddressDocument>,
+    @InjectModel(Nurse.name)
+    private readonly nurseModel: Model<NurseDocument>,
   ) {}
 
   async findById(id: string): Promise<UserDocument | null> {
@@ -82,7 +95,120 @@ export class UsersService {
     return updatedPatient;
   }
 
-  async getNurseProfile() {
-    return { id: 'mock-nurse-id', firstName: 'Jane', lastName: 'Nurse' };
+  async createPatientAddress(currentUser: any, dto: CreateAddressDto) {
+    if (currentUser.type !== UserType.PATIENT) {
+      throw new ForbiddenException('Only patients can create an address');
+    }
+
+    const patient = await this.patientModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Patient profile not found');
+    }
+    const address = await this.addressModel.create({
+      patientId: patient._id,
+      label: dto.label,
+      details: dto.details,
+      location: {
+        type: 'Point',
+        coordinates: [dto.longitude, dto.latitude],
+      },
+    });
+    return address;
+  }
+
+  async getPatientAddresses(currentUser: any) {
+    if (currentUser.type !== UserType.PATIENT) {
+      throw new ForbiddenException('Only patients can view addresses');
+    }
+    const patient = await this.patientModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Patient profile not found');
+    }
+    const addresses = await this.addressModel.find({
+      patientId: patient._id,
+    });
+
+    return addresses;
+  }
+
+  async deletePatientAddress(currentUser: any, addressId: string) {
+    if (currentUser.type !== UserType.PATIENT) {
+      throw new ForbiddenException('Only patients can delete addresses');
+    }
+
+    const patient = await this.patientModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Patient profile not found');
+    }
+  }
+
+  async createNurseProfile(currentUser: any, dto: CreateNurseDto) {
+    if (currentUser.type !== UserType.NURSE) {
+      throw new ForbiddenException('Only nurses can create a nurse profile');
+    }
+
+    const existingNurse = await this.nurseModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (existingNurse) {
+      throw new ConflictException('Nurse profile already exists');
+    }
+
+    const nurse = await this.nurseModel.create({
+      userId: currentUser.userId,
+      fullName: dto.fullName,
+      gender: dto.gender,
+      dateOfBirth: dto.dateOfBirth,
+      licenseNumber: dto.licenseNumber,
+      licenseExpiryDate: dto.licenseExpiryDate,
+      yearsOfExperience: dto.yearsOfExperience,
+      bio: dto.bio,
+      hourlyRate: dto.hourlyRate,
+      verificationStatus: VerificationStatus.INCOMPLETE,
+    });
+
+    return nurse;
+  }
+
+  async getNurseProfile(currentUser: any) {
+    const nurse = await this.nurseModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (!nurse) {
+      throw new NotFoundException('Nurse profile not found');
+    }
+    return nurse;
+  }
+
+  async updateNurseProfile(currentUser: any, dto: UpdateNurseDto) {
+    if (currentUser.type !== UserType.NURSE) {
+      throw new ForbiddenException('Only nurses can update a Nurse profile');
+    }
+
+    const nurse = await this.nurseModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (!Nurse) {
+      throw new NotFoundException('nurse profile not found');
+    }
+    const updatedNurse = await this.nurseModel.findOneAndUpdate(
+      { userId: currentUser.userId },
+      dto,
+      { new: true },
+    );
+
+    return updatedNurse;
   }
 }
