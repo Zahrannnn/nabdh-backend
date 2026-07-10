@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { HydratedDocument } from 'mongoose';
-import { DocumentType } from '../../../common/enums';
+import { DocumentType, VerificationStatus } from '../../../common/enums';
 
 export type NurseDocumentDoc = HydratedDocument<NurseDocument>;
 
@@ -14,13 +14,23 @@ export class NurseDocument {
   type: DocumentType;
 
   @Prop({ required: true })
-  fileUrl: string;
+  url: string;
 
-  @Prop({ default: false })
-  isVerified: boolean;
+  @Prop({ required: true })
+  key: string;
 
-  @Prop()
-  verifiedAt?: Date;
+  @Prop({ required: true })
+  mimeType: string;
+
+  @Prop({ required: true })
+  size: number;
+
+  @Prop({
+    required: true,
+    enum: VerificationStatus,
+    default: VerificationStatus.PENDING,
+  })
+  status: VerificationStatus;
 
   createdAt: Date;
   updatedAt: Date;

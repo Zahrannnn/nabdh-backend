@@ -7,9 +7,10 @@ import { Patient, PatientSchema } from './schemas/patient.schema';
 import { Nurse, NurseSchema } from './schemas/nurse.schema';
 import { Address, AddressSchema } from './schemas/address.schema';
 import { NurseDocument, NurseDocumentSchema } from './schemas/nurse-document.schema';
-
+import { UploadModule } from '../upload/upload.module';
 @Module({
   imports: [
+    UploadModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Patient.name, schema: PatientSchema },

@@ -13,12 +13,18 @@ import {
   CreateAddressDto,
   CreateNurseDto,
   UpdateNurseDto,
+  CreateNurseDocumentDto,
 } from './dto';
 import { User, UserDocument } from './schemas/user.schema';
 import { Patient, PatientDocument } from './schemas/patient.schema';
 import { UserType, VerificationStatus } from '../../common/enums';
 import { Address, AddressDocument } from './schemas/address.schema';
 import { Nurse, NurseDocument } from './schemas/nurse.schema';
+import {
+  NurseDocument as NurseDocumentEntity,
+  NurseDocumentDoc,
+} from './schemas/nurse-document.schema';
+import { UploadService } from '../upload/upload.service';
 @Injectable()
 export class UsersService {
   constructor(
@@ -30,6 +36,9 @@ export class UsersService {
     private readonly addressModel: Model<AddressDocument>,
     @InjectModel(Nurse.name)
     private readonly nurseModel: Model<NurseDocument>,
+    @InjectModel(NurseDocumentEntity.name)
+    private readonly nurseDocumentModel: Model<NurseDocumentDoc>,
+    private readonly uploadService: UploadService,
   ) {}
 
   async findById(id: string): Promise<UserDocument | null> {
@@ -55,6 +64,8 @@ export class UsersService {
       userId: currentUser.userId,
       fullName: dto.fullName,
       gender: dto.gender,
+      dateOfBirth: dto.dateOfBirth,
+      photoUrl: dto.photoUrl,
     });
     return patient;
   }
@@ -149,6 +160,18 @@ export class UsersService {
     if (!patient) {
       throw new NotFoundException('Patient profile not found');
     }
+    const address = await this.addressModel.findOneAndDelete({
+      _id: addressId,
+      patientId: patient._id,
+    });
+
+    if (!address) {
+      throw new NotFoundException('Address not found');
+    }
+
+    return {
+      message: 'Address deleted successfully',
+    };
   }
 
   async createNurseProfile(currentUser: any, dto: CreateNurseDto) {
@@ -181,6 +204,10 @@ export class UsersService {
   }
 
   async getNurseProfile(currentUser: any) {
+    if (currentUser.type !== UserType.NURSE) {
+      throw new ForbiddenException('Only nurses can view their profile');
+    }
+
     const nurse = await this.nurseModel.findOne({
       userId: currentUser.userId,
     });
@@ -188,6 +215,7 @@ export class UsersService {
     if (!nurse) {
       throw new NotFoundException('Nurse profile not found');
     }
+
     return nurse;
   }
 
@@ -200,7 +228,7 @@ export class UsersService {
       userId: currentUser.userId,
     });
 
-    if (!Nurse) {
+    if (!nurse) {
       throw new NotFoundException('nurse profile not found');
     }
     const updatedNurse = await this.nurseModel.findOneAndUpdate(
@@ -210,5 +238,37 @@ export class UsersService {
     );
 
     return updatedNurse;
+  }
+
+  async uploadNurseDocument(
+    currentUser: any,
+    file: Express.Multer.File,
+    dto: CreateNurseDocumentDto,
+  ) {
+    if (currentUser.type !== UserType.NURSE) {
+      throw new ForbiddenException('Only nurses can upload documents');
+    }
+
+    const nurse = await this.nurseModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (!nurse) {
+      throw new NotFoundException('Nurse profile not found');
+    }
+
+    const uploaded = await this.uploadService.upload(file);
+
+    const document = await this.nurseDocumentModel.create({
+      nurseId: nurse._id,
+      type: dto.type,
+      url: uploaded.url,
+      key: uploaded.key,
+      mimeType: uploaded.mimeType,
+      size: uploaded.size,
+      status: VerificationStatus.PENDING,
+    });
+
+    return document;
   }
 }
