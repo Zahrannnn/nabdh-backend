@@ -4,3 +4,4 @@ export { CreateAddressDto } from './create-address.dto';
 export { CreateNurseDto } from './create-nurse.dto';
 export { UpdateNurseDto } from './update-nurse.dto';
 export { CreateNurseDocumentDto } from './create-nurse-document.dto';
+export { UpdateNurseAvailabilityDto } from './update-nurse-availability.dto';

@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -14,6 +15,7 @@ import {
   CreateNurseDto,
   UpdateNurseDto,
   CreateNurseDocumentDto,
+  UpdateNurseAvailabilityDto,
 } from './dto';
 import { User, UserDocument } from './schemas/user.schema';
 import { Patient, PatientDocument } from './schemas/patient.schema';
@@ -27,6 +29,7 @@ import {
 import { UploadService } from '../upload/upload.service';
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
@@ -270,5 +273,99 @@ export class UsersService {
     });
 
     return document;
+  }
+
+  async getNurseDocuments(currentUser: any) {
+    if (currentUser.type !== UserType.NURSE) {
+      throw new ForbiddenException('Only nurses can view their documents');
+    }
+    const nurse = await this.nurseModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (!nurse) {
+      throw new NotFoundException('Nurse profile not found');
+    }
+    const documents = await this.nurseDocumentModel.find({
+      nurseId: nurse._id,
+    });
+
+    return documents;
+  }
+
+  async deleteNurseDocument(currentUser: any, documentId: string) {
+    if (currentUser.type !== UserType.NURSE) {
+      throw new ForbiddenException('Only nurses can delete their documents');
+    }
+
+    const nurse = await this.nurseModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (!nurse) {
+      throw new NotFoundException('Nurse profile not found');
+    }
+
+    const document = await this.nurseDocumentModel.findOneAndDelete({
+      _id: documentId,
+      nurseId: nurse._id,
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    await this.uploadService.delete(document.key);
+    await this.nurseDocumentModel.deleteOne({
+      _id: documentId,
+    });
+    return {
+      message: 'Document deleted successfully',
+    };
+  }
+
+  async updateNurseAvailability(currentUser: any, dto: UpdateNurseAvailabilityDto) {
+    if (currentUser.type !== UserType.NURSE) {
+      throw new ForbiddenException('Only nurses can update availability');
+    }
+    const nurse = await this.nurseModel.findOne({
+      userId: currentUser.userId,
+    });
+
+    if (!nurse) {
+      throw new NotFoundException('Nurse profile not found');
+    }
+
+    if (dto.isOnline) {
+      if (nurse.verificationStatus !== VerificationStatus.APPROVED) {
+        throw new BadRequestException('Your account must be approved before going online');
+      }
+      if (nurse.licenseExpiryDate <= new Date()) {
+        throw new BadRequestException('Your nursing license has expired');
+      }
+      const minBalance = Number(process.env.NURSE_MIN_PREPAID_BALANCE ?? 100);
+
+      if (nurse.prepaidBalance < minBalance) {
+        throw new BadRequestException(`Minimum prepaid balance is ${minBalance}`);
+      }
+    }
+    this.logger.warn('TODO: Active booking check will be implemented in Sprint 2');
+
+    nurse.isOnline = dto.isOnline;
+    await nurse.save();
+    return nurse;
+  }
+
+  async getPublicNurseProfile(nurseId: string) {
+    const nurse = await this.nurseModel
+      .findById(nurseId)
+      .select(
+        'fullName photoUrl gender avgRating totalRatings yearsOfExperience bio hourlyRate -_id',
+      );
+    if (!nurse) {
+      throw new NotFoundException('Nurse not found');
+    }
+
+    return nurse;
   }
 }
