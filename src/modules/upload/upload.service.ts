@@ -1,6 +1,14 @@
 import { Injectable, InternalServerErrorException, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -23,6 +31,20 @@ export class UploadService implements OnModuleInit {
         secretAccessKey: this.configService.get<string>('S3_SECRET_KEY')!,
       },
     });
+
+    try {
+      await this.client.send(
+        new HeadBucketCommand({
+          Bucket: this.bucket,
+        }),
+      );
+    } catch {
+      await this.client.send(
+        new CreateBucketCommand({
+          Bucket: this.bucket,
+        }),
+      );
+    }
   }
 
   async upload(file: Express.Multer.File) {
@@ -58,6 +80,19 @@ export class UploadService implements OnModuleInit {
         Bucket: this.bucket,
         Key: key,
       }),
+    );
+  }
+
+  async getSignedUrl(key: string) {
+    return getSignedUrl(
+      this.client,
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+      {
+        expiresIn: 900, // 15 minutes
+      },
     );
   }
 }

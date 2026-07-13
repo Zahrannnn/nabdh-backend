@@ -23,6 +23,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { UploadModule } from '@modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     NotificationsModule,
     AdminModule,
     AnalyticsModule,
+    UploadModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
