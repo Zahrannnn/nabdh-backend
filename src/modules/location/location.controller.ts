@@ -1,25 +1,35 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Query, Param } from '@nestjs/common';
+import { UpdateLocationDto, NearbyQueryDto } from './dto';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '@common/guards';
+import { CurrentUser, Roles } from '@common/decorators';
 import { LocationService } from './location.service';
-import { Public } from '../../common/decorators/public.decorator';
+import { UserType } from '@common/enums';
 
 @ApiTags('Location')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller()
 export class LocationController {
   constructor(private readonly locationService: LocationService) {}
 
-  @Public()
+  @Roles(UserType.NURSE)
   @Post('nurse/location')
   @ApiOperation({ summary: 'Update nurse GPS location' })
-  async updateLocation(@Body() body: { latitude: number; longitude: number }) {
-    return this.locationService.updateLocation(body);
+  async updateLocation(@CurrentUser() user: any, @Body() body: UpdateLocationDto) {
+    return this.locationService.updateLocation(user._id, body);
   }
-
-  @Public()
+  @Roles(UserType.PATIENT)
   @Get('nurses/nearby')
   @ApiOperation({ summary: 'Find nearby nurses' })
-  async findNearbyNurses() {
-    return this.locationService.findNearbyNurses();
+  async findNearbyNurses(@Query() query: NearbyQueryDto) {
+    return this.locationService.findNearbyNurses(query);
+  }
+
+  @Roles(UserType.ADMIN, UserType.NURSE)
+  @Get('nurse/location-history/:nurseId')
+  @ApiOperation({ summary: 'Get nurse location history' })
+  async getLocationHistory(@Param('nurseId') nurseId: string, @CurrentUser() user: any) {
+    return this.locationService.getLocationHistory(nurseId, user._id, user.type);
   }
 }
