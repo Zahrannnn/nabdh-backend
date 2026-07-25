@@ -13,7 +13,7 @@ export class AuthController {
 
   @Public()
   @Post('otp/send')
-  @ApiOperation({ summary: 'Send OTP verification code to phone number' })
+  @ApiOperation({ summary: 'Send OTP verification code to email' })
   @ApiResponse({ status: 200, description: 'OTP sent successfully' })
   async sendOtp(@Body() dto: SendOtpDto) {
     return this.authService.sendOtp(dto);

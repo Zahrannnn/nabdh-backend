@@ -1,19 +1,3 @@
-jest.mock('otplib', () => ({
-  OTP: jest.fn().mockImplementation(() => ({
-    verify: jest.fn().mockResolvedValue({ valid: true }),
-    generateSecret: jest.fn().mockReturnValue('mock_base32_secret'),
-    generateURI: jest
-      .fn()
-      .mockReturnValue('otpauth://totp/Nabdh:admin@test.com?secret=mock_base32_secret'),
-  })),
-  NobleCryptoPlugin: jest.fn().mockImplementation(() => ({})),
-  ScureBase32Plugin: jest.fn().mockImplementation(() => ({})),
-}));
-
-jest.mock('qrcode', () => ({
-  toDataURL: jest.fn().mockResolvedValue('data:image/png;base64,mock_qr_data'),
-}));
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { MongoMemoryServer } from 'mongodb-memory-server';
@@ -26,7 +10,7 @@ import request from 'supertest';
 
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { UsersModule } from '../src/modules/users/users.module';
-import { SmsProvider } from '../src/modules/auth/providers/sms.provider';
+import { EmailProvider } from '../src/modules/auth/providers/email.provider';
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 import { AllExceptionsFilter } from '../src/common/filters/http-exception.filter';
@@ -36,26 +20,25 @@ import { Nurse } from '../src/modules/users/schemas/nurse.schema';
 import { OtpSession } from '../src/modules/auth/schemas/otp-session.schema';
 import { RefreshToken } from '../src/modules/auth/schemas/refresh-token.schema';
 
-class CapturingSmsProvider extends SmsProvider {
+class CapturingEmailProvider extends EmailProvider {
   public lastCode: string | null = null;
-  public lastMessage: string | null = null;
-  public lastPhone: string | null = null;
-  async sendSms(phone: string, message: string): Promise<void> {
-    this.lastPhone = phone;
-    this.lastMessage = message;
-    const match = message.match(/\d{6}/);
+  public lastEmail: string | null = null;
+  constructor() {
+    super({ get: () => undefined } as any);
+  }
+  async sendEmail(to: string, _subject: string, body: string): Promise<void> {
+    this.lastEmail = to;
+    const match = body.match(/\d{6}/);
     this.lastCode = match ? match[0] : null;
   }
 }
 
 const JWT_SECRET = 'test-secret-e2e';
 
-// ConfigService provided globally via ConfigModule.forRoot in test module
-
 describe('Auth E2E', () => {
   let app: INestApplication;
   let mongoServer: MongoMemoryServer;
-  let smsProvider: CapturingSmsProvider;
+  let emailProvider: CapturingEmailProvider;
   let userModel: any;
   let patientModel: any;
   let nurseModel: any;
@@ -70,7 +53,7 @@ describe('Auth E2E', () => {
     process.env.JWT_SECRET = JWT_SECRET;
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
-    smsProvider = new CapturingSmsProvider();
+    emailProvider = new CapturingEmailProvider();
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [
@@ -87,8 +70,8 @@ describe('Auth E2E', () => {
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
       ],
     })
-      .overrideProvider(SmsProvider)
-      .useValue(smsProvider)
+      .overrideProvider(EmailProvider)
+      .useValue(emailProvider)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -118,35 +101,35 @@ describe('Auth E2E', () => {
   }, 30000);
 
   describe('1. Full OTP flow for patient', () => {
-    const phone = '+201111111111';
+    const email = 'patient@test.com';
 
     it('sends OTP, captures code, registers patient, and returns valid tokens', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'PATIENT' })
+        .send({ email, role: 'PATIENT' })
         .expect(201)
         .expect((res) => {
           expect(res.body.message).toBe('تم إرسال رمز التحقق بنجاح');
         });
 
-      expect(smsProvider.lastCode).toMatch(/^\d{6}$/);
-      expect(smsProvider.lastPhone).toBe(phone);
+      expect(emailProvider.lastCode).toMatch(/^\d{6}$/);
+      expect(emailProvider.lastEmail).toBe(email);
 
       const verifyRes = await request(app.getHttpServer())
         .post('/api/v1/auth/otp/verify')
-        .send({ phone, code: smsProvider.lastCode, role: 'PATIENT' })
+        .send({ email, code: emailProvider.lastCode, role: 'PATIENT' })
         .expect(200);
 
       expect(verifyRes.body.accessToken).toBeDefined();
       expect(verifyRes.body.refreshToken).toBeDefined();
       expect(verifyRes.body.user.id).toBeDefined();
-      expect(verifyRes.body.user.phone).toBe(phone);
+      expect(verifyRes.body.user.email).toBe(email);
       expect(verifyRes.body.user.type).toBe('PATIENT');
 
       const accessToken = verifyRes.body.accessToken;
       const refreshToken = verifyRes.body.refreshToken;
 
-      const user = await userModel.findOne({ phone });
+      const user = await userModel.findOne({ email });
       expect(user).toBeTruthy();
       expect(user.type).toBe('PATIENT');
       expect(user.status).toBe('ACTIVE');
@@ -156,35 +139,34 @@ describe('Auth E2E', () => {
 
       const decoded = jwtService.verify(accessToken) as Record<string, unknown>;
       expect(decoded.type).toBe('PATIENT');
-      expect(decoded.phone).toBe(phone);
       expect(decoded.sub).toBeDefined();
 
       patientTokens = { accessToken, refreshToken, userId: user._id.toString() };
 
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'NURSE' })
+        .send({ email, role: 'NURSE' })
         .expect(409)
         .expect((res) => {
-          expect(res.body.message).toContain('هذا الرقم مسجل بنوع مستخدم مختلف');
+          expect(res.body.message).toContain('هذا البريد مسجل بنوع مستخدم مختلف');
         });
     });
   });
 
   describe('2. Full OTP flow for nurse', () => {
-    const phone = '+201222222222';
+    const email = 'nurse@test.com';
 
     it('registers nurse with INCOMPLETE verification status', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'NURSE' })
+        .send({ email, role: 'NURSE' })
         .expect(201);
 
-      expect(smsProvider.lastCode).toMatch(/^\d{6}$/);
+      expect(emailProvider.lastCode).toMatch(/^\d{6}$/);
 
       const verifyRes = await request(app.getHttpServer())
         .post('/api/v1/auth/otp/verify')
-        .send({ phone, code: smsProvider.lastCode, role: 'NURSE' })
+        .send({ email, code: emailProvider.lastCode, role: 'NURSE' })
         .expect(200);
 
       expect(verifyRes.body.accessToken).toBeDefined();
@@ -193,7 +175,7 @@ describe('Auth E2E', () => {
       expect(verifyRes.body.user.nurseStatus).toBe('INCOMPLETE');
 
       const accessToken = verifyRes.body.accessToken;
-      const user = await userModel.findOne({ phone });
+      const user = await userModel.findOne({ email });
       expect(user).toBeTruthy();
       expect(user.type).toBe('NURSE');
 
@@ -232,17 +214,17 @@ describe('Auth E2E', () => {
   });
 
   describe('4. Logout flow', () => {
-    const phone = '+201333333333';
+    const email = 'logout@test.com';
 
     it('logs out a user and revokes the refresh token', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'PATIENT' })
+        .send({ email, role: 'PATIENT' })
         .expect(201);
 
       const verifyRes = await request(app.getHttpServer())
         .post('/api/v1/auth/otp/verify')
-        .send({ phone, code: smsProvider.lastCode, role: 'PATIENT' })
+        .send({ email, code: emailProvider.lastCode, role: 'PATIENT' })
         .expect(200);
 
       const accessToken = verifyRes.body.accessToken;
@@ -273,27 +255,27 @@ describe('Auth E2E', () => {
   });
 
   describe('6. Logout with mismatched user', () => {
-    const phoneA = '+201444444444';
-    const phoneB = '+201455555555';
+    const emailA = 'usera@test.com';
+    const emailB = 'userb@test.com';
 
     it('rejects logout with another user refresh token', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone: phoneA, role: 'PATIENT' })
+        .send({ email: emailA, role: 'PATIENT' })
         .expect(201);
       const aVerify = await request(app.getHttpServer())
         .post('/api/v1/auth/otp/verify')
-        .send({ phone: phoneA, code: smsProvider.lastCode, role: 'PATIENT' })
+        .send({ email: emailA, code: emailProvider.lastCode, role: 'PATIENT' })
         .expect(200);
       const aRefresh = aVerify.body.refreshToken;
 
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone: phoneB, role: 'PATIENT' })
+        .send({ email: emailB, role: 'PATIENT' })
         .expect(201);
       const bVerify = await request(app.getHttpServer())
         .post('/api/v1/auth/otp/verify')
-        .send({ phone: phoneB, code: smsProvider.lastCode, role: 'PATIENT' })
+        .send({ email: emailB, code: emailProvider.lastCode, role: 'PATIENT' })
         .expect(200);
       const bAccess = bVerify.body.accessToken;
 
@@ -305,25 +287,25 @@ describe('Auth E2E', () => {
     });
   });
 
-  describe('7. Phone-level rate limiting', () => {
-    const phone = '+201666666666';
+  describe('7. Email-level rate limiting', () => {
+    const email = 'ratelimit@test.com';
 
-    it('blocks 4th sendOtp within 15 minutes for same phone', async () => {
+    it('blocks 4th sendOtp within 15 minutes for same email', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'PATIENT' })
+        .send({ email, role: 'PATIENT' })
         .expect(201);
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'PATIENT' })
+        .send({ email, role: 'PATIENT' })
         .expect(201);
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'PATIENT' })
+        .send({ email, role: 'PATIENT' })
         .expect(201);
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'PATIENT' })
+        .send({ email, role: 'PATIENT' })
         .expect(429)
         .expect((res) => {
           expect(res.body.message[0]).toBe('الرجاء المحاولة مرة أخرى بعد قليل');
@@ -332,24 +314,24 @@ describe('Auth E2E', () => {
   });
 
   describe('8. Role mismatch on sendOtp', () => {
-    const phone = '+201777777777';
+    const email = 'rolemismatch@test.com';
 
     it('rejects sendOtp for existing user with different role', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'NURSE' })
+        .send({ email, role: 'NURSE' })
         .expect(201);
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/verify')
-        .send({ phone, code: smsProvider.lastCode, role: 'NURSE' })
+        .send({ email, code: emailProvider.lastCode, role: 'NURSE' })
         .expect(200);
 
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'PATIENT' })
+        .send({ email, role: 'PATIENT' })
         .expect(409)
         .expect((res) => {
-          expect(res.body.message[0]).toBe('هذا الرقم مسجل بنوع مستخدم مختلف');
+          expect(res.body.message[0]).toBe('هذا البريد مسجل بنوع مستخدم مختلف');
         });
     });
   });
@@ -378,28 +360,28 @@ describe('Auth E2E', () => {
   });
 
   describe('10. Suspended user cannot login', () => {
-    const phone = '+201888888888';
+    const email = 'suspended@test.com';
 
     it('rejects OTP verification for suspended user with 403', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'PATIENT' })
+        .send({ email, role: 'PATIENT' })
         .expect(201);
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/verify')
-        .send({ phone, code: smsProvider.lastCode, role: 'PATIENT' })
+        .send({ email, code: emailProvider.lastCode, role: 'PATIENT' })
         .expect(200);
 
-      await userModel.updateOne({ phone }, { $set: { status: 'SUSPENDED' } });
+      await userModel.updateOne({ email }, { $set: { status: 'SUSPENDED' } });
 
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/send')
-        .send({ phone, role: 'PATIENT' })
+        .send({ email, role: 'PATIENT' })
         .expect(201);
 
       await request(app.getHttpServer())
         .post('/api/v1/auth/otp/verify')
-        .send({ phone, code: smsProvider.lastCode, role: 'PATIENT' })
+        .send({ email, code: emailProvider.lastCode, role: 'PATIENT' })
         .expect(403)
         .expect((res) => {
           expect(res.body.message[0]).toBe('تم تعليق حسابك، تواصل مع الدعم');

@@ -6,7 +6,7 @@ export type OtpSessionDocument = HydratedDocument<OtpSession>;
 @Schema({ collection: 'otp_sessions', timestamps: { createdAt: true, updatedAt: false } })
 export class OtpSession {
   @Prop({ required: true, index: true })
-  phone: string;
+  email: string;
 
   @Prop({ required: true })
   codeHash: string;

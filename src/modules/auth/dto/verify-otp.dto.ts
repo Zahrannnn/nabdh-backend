@@ -1,23 +1,20 @@
 import {
   IsString,
   IsNotEmpty,
-  Matches,
+  IsEmail,
   IsIn,
   IsOptional,
   IsObject,
   Length,
-  MaxLength,
+  Matches,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserType } from '../../../common/enums';
 
 export class VerifyOtpDto {
-  @ApiProperty({ example: '+201234567890' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(20, { message: 'phone must not exceed 20 characters' })
-  @Matches(/^\+201[0-9]{9}$/, { message: 'phone must be a valid Egyptian mobile number' })
-  phone: string;
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
+  email: string;
 
   @ApiProperty({ example: '123456' })
   @IsString()

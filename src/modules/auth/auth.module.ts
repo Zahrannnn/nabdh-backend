@@ -15,7 +15,7 @@ import { OtpSession, OtpSessionSchema } from './schemas/otp-session.schema';
 import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema';
 import { TempToken, TempTokenSchema } from './schemas/temp-token.schema';
 import { OtpService, TokenService } from './services';
-import { SmsProvider, SmsStubProvider, TwilioSmsProvider } from './providers';
+import { EmailProvider } from './providers';
 
 @Module({
   imports: [
@@ -39,23 +39,7 @@ import { SmsProvider, SmsStubProvider, TwilioSmsProvider } from './providers';
     forwardRef(() => UsersModule),
   ],
   controllers: [AuthController, AdminAuthController],
-  providers: [
-    AuthService,
-    AdminAuthService,
-    JwtStrategy,
-    OtpService,
-    TokenService,
-    {
-      provide: SmsProvider,
-      useFactory: (configService: ConfigService) => {
-        if (configService.get<string>('SMS_PROVIDER') === 'twilio') {
-          return new TwilioSmsProvider(configService);
-        }
-        return new SmsStubProvider();
-      },
-      inject: [ConfigService],
-    },
-  ],
-  exports: [AuthService, JwtStrategy, OtpService, TokenService, SmsProvider],
+  providers: [AuthService, AdminAuthService, JwtStrategy, OtpService, TokenService, EmailProvider],
+  exports: [AuthService, JwtStrategy, OtpService, TokenService, EmailProvider],
 })
 export class AuthModule {}
