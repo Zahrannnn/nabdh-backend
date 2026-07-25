@@ -5,7 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import { OtpService } from './otp.service';
 import { OtpSession } from '../schemas/otp-session.schema';
 
-jest.mock('bcrypt', () => ({
+jest.mock('bcryptjs', () => ({
   hash: jest.fn().mockResolvedValue('hashed_code'),
   compare: jest.fn().mockResolvedValue(true),
 }));
@@ -44,16 +44,16 @@ describe('OtpService', () => {
 
   describe('createOtpSession', () => {
     it('calls bcrypt.hash and saves a new session document', async () => {
-      const phone = '+201234567890';
+      const email = 'user@test.com';
       const code = '123456';
 
-      const result = await service.createOtpSession(phone, code);
+      const result = await service.createOtpSession(email, code);
 
       expect(bcrypt.hash).toHaveBeenCalledWith(code, 10);
       expect(mockOtpSessionModel).toHaveBeenCalledWith(
-        expect.objectContaining({ phone, codeHash: 'hashed_code' }),
+        expect.objectContaining({ email, codeHash: 'hashed_code' }),
       );
-      expect(result.phone).toBe(phone);
+      expect(result.email).toBe(email);
       expect(result.codeHash).toBe('hashed_code');
       expect(result.expiresAt).toBeInstanceOf(Date);
     });
@@ -62,7 +62,7 @@ describe('OtpService', () => {
   describe('verifyOtpSession', () => {
     it('returns true when code matches and marks session as used', async () => {
       const mockSession = {
-        phone: '+201234567890',
+        email: 'user@test.com',
         codeHash: 'hashed_code',
         attempts: 0,
         isUsed: false,
@@ -72,7 +72,7 @@ describe('OtpService', () => {
         sort: jest.fn().mockResolvedValue(mockSession),
       });
 
-      const result = await service.verifyOtpSession('+201234567890', '123456');
+      const result = await service.verifyOtpSession('user@test.com', '123456');
 
       expect(result).toBe(true);
       expect(mockSession.isUsed).toBe(true);
@@ -83,7 +83,7 @@ describe('OtpService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
 
       const mockSession = {
-        phone: '+201234567890',
+        email: 'user@test.com',
         codeHash: 'hashed_code',
         attempts: 0,
         isUsed: false,
@@ -93,7 +93,7 @@ describe('OtpService', () => {
         sort: jest.fn().mockResolvedValue(mockSession),
       });
 
-      await expect(service.verifyOtpSession('+201234567890', 'wrong_code')).rejects.toThrow(
+      await expect(service.verifyOtpSession('user@test.com', 'wrong_code')).rejects.toThrow(
         UnauthorizedException,
       );
 
@@ -103,7 +103,7 @@ describe('OtpService', () => {
 
     it('throws UnauthorizedException when attempts >= 3 even if code is correct', async () => {
       const mockSession = {
-        phone: '+201234567890',
+        email: 'user@test.com',
         codeHash: 'hashed_code',
         attempts: 3,
         isUsed: false,
@@ -113,7 +113,7 @@ describe('OtpService', () => {
         sort: jest.fn().mockResolvedValue(mockSession),
       });
 
-      await expect(service.verifyOtpSession('+201234567890', '123456')).rejects.toThrow(
+      await expect(service.verifyOtpSession('user@test.com', '123456')).rejects.toThrow(
         UnauthorizedException,
       );
 
@@ -122,7 +122,7 @@ describe('OtpService', () => {
 
     it('throws UnauthorizedException when attempts > 3', async () => {
       const mockSession = {
-        phone: '+201234567890',
+        email: 'user@test.com',
         codeHash: 'hashed_code',
         attempts: 5,
         isUsed: false,
@@ -132,7 +132,7 @@ describe('OtpService', () => {
         sort: jest.fn().mockResolvedValue(mockSession),
       });
 
-      await expect(service.verifyOtpSession('+201234567890', '123456')).rejects.toThrow(
+      await expect(service.verifyOtpSession('user@test.com', '123456')).rejects.toThrow(
         UnauthorizedException,
       );
     });
@@ -142,7 +142,7 @@ describe('OtpService', () => {
         sort: jest.fn().mockResolvedValue(null),
       });
 
-      await expect(service.verifyOtpSession('+201234567890', '123456')).rejects.toThrow(
+      await expect(service.verifyOtpSession('user@test.com', '123456')).rejects.toThrow(
         UnauthorizedException,
       );
     });

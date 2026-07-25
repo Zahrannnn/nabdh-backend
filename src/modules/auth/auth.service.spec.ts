@@ -4,7 +4,7 @@ import { ConflictException, UnauthorizedException, NotFoundException } from '@ne
 import { AuthService } from './auth.service';
 import { OtpService } from './services/otp.service';
 import { TokenService } from './services/token.service';
-import { SmsProvider } from './providers/sms.provider';
+import { EmailProvider } from './providers/email.provider';
 import { User } from '../users/schemas/user.schema';
 import { OtpSession } from './schemas/otp-session.schema';
 import { RefreshToken } from './schemas/refresh-token.schema';
@@ -19,9 +19,9 @@ describe('AuthService', () => {
   let mockNurseModel: any;
   let mockOtpService: jest.Mocked<Partial<OtpService>>;
   let mockTokenService: jest.Mocked<Partial<TokenService>>;
-  let mockSmsProvider: jest.Mocked<Partial<SmsProvider>>;
+  let mockEmailProvider: jest.Mocked<Partial<EmailProvider>>;
 
-  const testPhone = '+201234567890';
+  const testEmail = 'patient@test.com';
   const testCode = '123456';
 
   beforeEach(async () => {
@@ -55,8 +55,8 @@ describe('AuthService', () => {
       revokeRefreshToken: jest.fn().mockResolvedValue(undefined),
     };
 
-    mockSmsProvider = {
-      sendSms: jest.fn().mockResolvedValue(undefined),
+    mockEmailProvider = {
+      sendEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -69,7 +69,7 @@ describe('AuthService', () => {
         { provide: getModelToken(Nurse.name), useValue: mockNurseModel },
         { provide: OtpService, useValue: mockOtpService },
         { provide: TokenService, useValue: mockTokenService },
-        { provide: SmsProvider, useValue: mockSmsProvider },
+        { provide: EmailProvider, useValue: mockEmailProvider },
       ],
     }).compile();
 
@@ -81,21 +81,22 @@ describe('AuthService', () => {
   });
 
   describe('sendOtp', () => {
-    it('does not create a user — only generates OTP and sends SMS', async () => {
+    it('does not create a user — only generates OTP and sends email', async () => {
       mockUserModel.findOne.mockResolvedValue(null);
 
       const result = await service.sendOtp({
-        phone: testPhone,
+        email: testEmail,
         role: UserType.PATIENT,
       });
 
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ phone: testPhone });
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({ email: testEmail });
       expect(mockUserModel.create).not.toHaveBeenCalled();
       expect(mockOtpService.generateOtp).toHaveBeenCalled();
-      expect(mockOtpService.createOtpSession).toHaveBeenCalledWith(testPhone, testCode);
-      expect(mockSmsProvider.sendSms).toHaveBeenCalledWith(
-        testPhone,
-        expect.stringContaining(testCode),
+      expect(mockOtpService.createOtpSession).toHaveBeenCalledWith(testEmail, testCode);
+      expect(mockEmailProvider.sendEmail).toHaveBeenCalledWith(
+        testEmail,
+        expect.any(String),
+        testCode,
       );
       expect(result.message).toBe('تم إرسال رمز التحقق بنجاح');
     });
@@ -103,12 +104,12 @@ describe('AuthService', () => {
     it('returns Arabic message when user exists with matching role', async () => {
       mockUserModel.findOne.mockResolvedValue({
         _id: 'existing_user',
-        phone: testPhone,
+        email: testEmail,
         type: UserType.NURSE,
       });
 
       const result = await service.sendOtp({
-        phone: testPhone,
+        email: testEmail,
         role: UserType.NURSE,
       });
 
@@ -120,13 +121,13 @@ describe('AuthService', () => {
     it('throws ConflictException when user exists with different role', async () => {
       mockUserModel.findOne.mockResolvedValue({
         _id: 'existing_user',
-        phone: testPhone,
+        email: testEmail,
         type: UserType.NURSE,
       });
 
       await expect(
         service.sendOtp({
-          phone: testPhone,
+          email: testEmail,
           role: UserType.PATIENT,
         }),
       ).rejects.toThrow(ConflictException);
@@ -140,20 +141,21 @@ describe('AuthService', () => {
     it('returns accessToken, refreshToken and user on success', async () => {
       const mockUser = {
         _id: { toString: () => 'user_id_123' },
-        phone: testPhone,
+        email: testEmail,
+        phone: '+201234567890',
         type: UserType.PATIENT,
         status: UserStatus.ACTIVE,
       };
       mockUserModel.findOne.mockResolvedValue(mockUser);
 
       const result = await service.verifyOtp({
-        phone: testPhone,
+        email: testEmail,
         code: testCode,
         role: UserType.PATIENT,
       });
 
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ phone: testPhone });
-      expect(mockOtpService.verifyOtpSession).toHaveBeenCalledWith(testPhone, testCode);
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({ email: testEmail });
+      expect(mockOtpService.verifyOtpSession).toHaveBeenCalledWith(testEmail, testCode);
       expect(mockTokenService.generateAccessToken).toHaveBeenCalled();
       expect(mockTokenService.createRefreshToken).toHaveBeenCalledWith('user_id_123');
       expect(result.accessToken).toBe('access_token');
@@ -161,10 +163,10 @@ describe('AuthService', () => {
       expect(result.user).toBeDefined();
     });
 
-    it('creates a new user and Patient profile when user not found', async () => {
+    it('creates a new user when user not found', async () => {
       const newUser = {
         _id: { toString: () => 'new_user_id' },
-        phone: testPhone,
+        email: testEmail,
         type: UserType.PATIENT,
         status: UserStatus.ACTIVE,
       };
@@ -172,19 +174,15 @@ describe('AuthService', () => {
       mockUserModel.create.mockResolvedValue(newUser);
 
       const result = await service.verifyOtp({
-        phone: testPhone,
+        email: testEmail,
         code: testCode,
         role: UserType.PATIENT,
       });
 
       expect(mockUserModel.create).toHaveBeenCalledWith({
-        phone: testPhone,
+        email: testEmail,
         type: UserType.PATIENT,
         status: UserStatus.ACTIVE,
-      });
-      expect(mockPatientModel.create).toHaveBeenCalledWith({
-        userId: newUser._id,
-        fullName: '',
       });
       expect(result.accessToken).toBe('access_token');
       expect(result.user.id).toBe('new_user_id');
@@ -201,7 +199,8 @@ describe('AuthService', () => {
 
       const mockUser = {
         _id: 'user_id_123',
-        phone: testPhone,
+        email: testEmail,
+        phone: '+201234567890',
         type: UserType.PATIENT,
       };
       Object.assign(mockUser, { _id: { toString: () => 'user_id_123' } });

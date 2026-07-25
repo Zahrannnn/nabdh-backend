@@ -22,11 +22,11 @@ export class OtpService {
     return crypto.randomInt(100000, 1000000).toString();
   }
 
-  async createOtpSession(phone: string, code: string): Promise<OtpSessionDocument> {
+  async createOtpSession(email: string, code: string): Promise<OtpSessionDocument> {
     try {
       const codeHash = await bcrypt.hash(code, 10);
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-      const session = new this.otpSessionModel({ phone, codeHash, expiresAt });
+      const session = new this.otpSessionModel({ email, codeHash, expiresAt });
       return await session.save();
     } catch (err) {
       if (err instanceof HttpException) throw err;
@@ -47,11 +47,11 @@ export class OtpService {
     }
   }
 
-  async countRecentSessions(phone: string): Promise<number> {
+  async countRecentSessions(email: string): Promise<number> {
     try {
       const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
       return await this.otpSessionModel.countDocuments({
-        phone,
+        email,
         createdAt: { $gte: fifteenMinutesAgo },
       });
     } catch (err) {
@@ -73,10 +73,10 @@ export class OtpService {
     }
   }
 
-  async verifyOtpSession(phone: string, code: string): Promise<boolean> {
+  async verifyOtpSession(email: string, code: string): Promise<boolean> {
     try {
       const session = await this.otpSessionModel
-        .findOne({ phone, isUsed: false, expiresAt: { $gt: new Date() } })
+        .findOne({ email, isUsed: false, expiresAt: { $gt: new Date() } })
         .sort({ createdAt: -1 });
 
       if (!session || session.attempts >= 3) {
@@ -97,7 +97,7 @@ export class OtpService {
       if (err instanceof HttpException) throw err;
       if (err instanceof MongooseError) {
         if (err.name === 'CastError') {
-          throw new BadRequestException('رقم الهاتف غير صالح');
+          throw new BadRequestException('البريد الإلكتروني غير صالح');
         }
         throw new ServiceUnavailableException('خدمة قاعدة البيانات غير متاحة حالياً');
       }

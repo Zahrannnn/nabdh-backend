@@ -19,7 +19,7 @@ import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.sche
 import { SendOtpDto, VerifyOtpDto, RefreshTokenDto } from './dto';
 import { OtpService } from './services/otp.service';
 import { TokenService } from './services/token.service';
-import { SmsProvider } from './providers/sms.provider';
+import { EmailProvider } from './providers/email.provider';
 import { UserStatus, UserType, VerificationStatus } from '../../common/enums';
 
 @Injectable()
@@ -33,26 +33,26 @@ export class AuthService {
     @InjectModel(Nurse.name) private readonly nurseModel: Model<NurseDocument>,
     private readonly otpService: OtpService,
     private readonly tokenService: TokenService,
-    private readonly smsProvider: SmsProvider,
+    private readonly emailProvider: EmailProvider,
   ) {}
 
   async sendOtp(dto: SendOtpDto): Promise<{ message: string }> {
     try {
-      const recentCount = await this.otpService.countRecentSessions(dto.phone);
+      const recentCount = await this.otpService.countRecentSessions(dto.email);
       if (recentCount >= 3) {
         throw new HttpException('الرجاء المحاولة مرة أخرى بعد قليل', 429);
       }
 
-      const existingUser = await this.userModel.findOne({ phone: dto.phone });
+      const existingUser = await this.userModel.findOne({ email: dto.email });
       if (existingUser && existingUser.type !== dto.role) {
-        throw new ConflictException('هذا الرقم مسجل بنوع مستخدم مختلف');
+        throw new ConflictException('هذا البريد مسجل بنوع مستخدم مختلف');
       }
 
       const code = this.otpService.generateOtp();
-      await this.otpService.createOtpSession(dto.phone, code);
-      await this.smsProvider.sendSms(dto.phone, `رمز التحقق الخاص بك: ${code}`);
+      await this.otpService.createOtpSession(dto.email, code);
+      await this.emailProvider.sendEmail(dto.email, 'رمز التحقق من تطبيق نبض', code);
 
-      this.logger.log(`AUDIT: OTP_SENT phone=${dto.phone} role=${dto.role}`);
+      this.logger.log(`AUDIT: OTP_SENT email=${dto.email} role=${dto.role}`);
 
       return { message: 'تم إرسال رمز التحقق بنجاح' };
     } catch (err) {
@@ -75,7 +75,7 @@ export class AuthService {
         throw new ServiceUnavailableException('خدمة قاعدة البيانات غير متاحة حالياً');
       }
       if (e?.code === 11000) {
-        throw new ConflictException('هذا الرقم مسجل مسبقاً');
+        throw new ConflictException('هذا البريد مسجل مسبقاً');
       }
       this.logger.error(
         `Unexpected error in sendOtp: ${(err as Error)?.message}`,
@@ -88,13 +88,15 @@ export class AuthService {
   async verifyOtp(dto: VerifyOtpDto): Promise<{
     accessToken: string;
     refreshToken: string;
-    user: { id: string; phone: string; type: string; nurseStatus?: string };
+    isNewUser: boolean;
+    user: { id: string; email: string; type: string; nurseStatus?: string };
   }> {
     try {
-      await this.otpService.verifyOtpSession(dto.phone, dto.code);
+      await this.otpService.verifyOtpSession(dto.email, dto.code);
 
-      let user = await this.userModel.findOne({ phone: dto.phone });
+      let user = await this.userModel.findOne({ email: dto.email });
       let nurseStatus: string | undefined;
+      let isNewUser = false;
 
       if (user) {
         if (user.status !== UserStatus.ACTIVE) {
@@ -112,10 +114,11 @@ export class AuthService {
         }
       } else {
         user = await this.userModel.create({
-          phone: dto.phone,
+          email: dto.email,
           type: dto.role,
           status: UserStatus.ACTIVE,
         });
+        isNewUser = true;
 
         this.logger.log(`AUDIT: USER_REGISTERED userId=${user._id} type=${user.type}`);
       }
@@ -131,9 +134,10 @@ export class AuthService {
       return {
         accessToken,
         refreshToken,
+        isNewUser,
         user: {
           id: user._id.toString(),
-          phone: user.phone,
+          email: user.email || dto.email,
           type: user.type,
           nurseStatus,
         },
