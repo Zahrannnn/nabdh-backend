@@ -44,6 +44,7 @@ describe('AuthService', () => {
       generateOtp: jest.fn().mockReturnValue(testCode),
       createOtpSession: jest.fn().mockResolvedValue(undefined),
       verifyOtpSession: jest.fn().mockResolvedValue(true),
+      consumeOtpSession: jest.fn().mockResolvedValue(undefined),
       countRecentSessions: jest.fn().mockResolvedValue(0),
     };
 
@@ -156,6 +157,7 @@ describe('AuthService', () => {
 
       expect(mockUserModel.findOne).toHaveBeenCalledWith({ email: testEmail });
       expect(mockOtpService.verifyOtpSession).toHaveBeenCalledWith(testEmail, testCode);
+      expect(mockOtpService.consumeOtpSession).toHaveBeenCalledWith(testEmail);
       expect(mockTokenService.generateAccessToken).toHaveBeenCalled();
       expect(mockTokenService.createRefreshToken).toHaveBeenCalledWith('user_id_123');
       expect(result.accessToken).toBe('access_token');

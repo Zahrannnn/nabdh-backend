@@ -20,6 +20,7 @@ describe('OtpService', () => {
       save: jest.fn().mockResolvedValue(doc),
     })) as any;
     mockOtpSessionModel.findOne = jest.fn();
+    mockOtpSessionModel.updateOne = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,7 +61,7 @@ describe('OtpService', () => {
   });
 
   describe('verifyOtpSession', () => {
-    it('returns true when code matches and marks session as used', async () => {
+    it('returns true when code matches without marking session used', async () => {
       const mockSession = {
         email: 'user@test.com',
         codeHash: 'hashed_code',
@@ -75,8 +76,8 @@ describe('OtpService', () => {
       const result = await service.verifyOtpSession('user@test.com', '123456');
 
       expect(result).toBe(true);
-      expect(mockSession.isUsed).toBe(true);
-      expect(mockSession.save).toHaveBeenCalledTimes(1);
+      expect(mockSession.isUsed).toBe(false);
+      expect(mockSession.save).not.toHaveBeenCalled();
     });
 
     it('throws UnauthorizedException when code is wrong and increments attempts', async () => {
@@ -144,6 +145,19 @@ describe('OtpService', () => {
 
       await expect(service.verifyOtpSession('user@test.com', '123456')).rejects.toThrow(
         UnauthorizedException,
+      );
+    });
+  });
+
+  describe('consumeOtpSession', () => {
+    it('marks matching session as used', async () => {
+      mockOtpSessionModel.updateOne.mockResolvedValue({});
+
+      await service.consumeOtpSession('user@test.com');
+
+      expect(mockOtpSessionModel.updateOne).toHaveBeenCalledWith(
+        { email: 'user@test.com', isUsed: false },
+        { isUsed: true },
       );
     });
   });

@@ -131,6 +131,8 @@ export class AuthService {
       });
       const refreshToken = await this.tokenService.createRefreshToken(user._id.toString());
 
+      await this.otpService.consumeOtpSession(dto.email);
+
       return {
         accessToken,
         refreshToken,
