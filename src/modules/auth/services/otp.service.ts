@@ -90,8 +90,6 @@ export class OtpService {
         throw new UnauthorizedException('رمز التحقق غير صحيح');
       }
 
-      session.isUsed = true;
-      await session.save();
       return true;
     } catch (err) {
       if (err instanceof HttpException) throw err;
@@ -99,6 +97,28 @@ export class OtpService {
         if (err.name === 'CastError') {
           throw new BadRequestException('البريد الإلكتروني غير صالح');
         }
+        throw new ServiceUnavailableException('خدمة قاعدة البيانات غير متاحة حالياً');
+      }
+      const e = err as { name?: string; code?: number | string };
+      if (
+        e?.name === 'MongooseServerSelectionError' ||
+        e?.name === 'MongoServerSelectionError' ||
+        e?.name === 'MongoNetworkError' ||
+        e?.code === 'ECONNREFUSED' ||
+        e?.code === 'ETIMEDOUT'
+      ) {
+        throw new ServiceUnavailableException('خدمة قاعدة البيانات غير متاحة حالياً');
+      }
+      throw new InternalServerErrorException('حدث خطأ غير متوقع');
+    }
+  }
+
+  async consumeOtpSession(email: string): Promise<void> {
+    try {
+      await this.otpSessionModel.updateOne({ email, isUsed: false }, { isUsed: true });
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      if (err instanceof MongooseError) {
         throw new ServiceUnavailableException('خدمة قاعدة البيانات غير متاحة حالياً');
       }
       const e = err as { name?: string; code?: number | string };
