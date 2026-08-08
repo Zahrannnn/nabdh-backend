@@ -43,7 +43,7 @@ export class AuthController {
     return this.authService.refresh(dto);
   }
 
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)

@@ -4,7 +4,7 @@ import { NotificationsService } from './notifications.service';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Notifications')
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}

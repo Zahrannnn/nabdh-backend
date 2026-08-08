@@ -4,7 +4,7 @@ import { AdminService } from './admin.service';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Admin')
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}

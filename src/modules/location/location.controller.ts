@@ -7,7 +7,7 @@ import { LocationService } from './location.service';
 import { UserType } from '@common/enums';
 
 @ApiTags('Location')
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class LocationController {

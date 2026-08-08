@@ -4,7 +4,7 @@ import { AnalyticsService } from './analytics.service';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Analytics')
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}

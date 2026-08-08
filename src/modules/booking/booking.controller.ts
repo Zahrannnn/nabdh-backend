@@ -5,7 +5,7 @@ import { CreateRequestDto } from './dto';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Booking')
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 @Controller()
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}

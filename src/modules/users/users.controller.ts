@@ -32,7 +32,7 @@ import { UserType } from '@common/enums';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Users')
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class UsersController {

@@ -4,7 +4,7 @@ import { PaymentService } from './payment.service';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Payment')
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 @Controller()
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}

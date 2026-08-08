@@ -35,7 +35,7 @@ export class AdminAuthController {
 
   @Post('setup-2fa')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @Roles(UserType.ADMIN)
   @ApiOperation({ summary: 'Generate TOTP secret and QR code' })
   @ApiResponse({ status: 200, description: '2FA setup data', type: SetupTwoFactorResponseDto })
@@ -46,7 +46,7 @@ export class AdminAuthController {
 
   @Post('activate-2fa')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @Roles(UserType.ADMIN)
   @ApiOperation({ summary: 'Activate 2FA by verifying TOTP code' })
   @ApiResponse({ status: 200, description: '2FA activated' })
