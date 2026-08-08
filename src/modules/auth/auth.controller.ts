@@ -1,5 +1,11 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { SendOtpDto, VerifyOtpDto, RefreshTokenDto } from './dto';
 import { Public } from '../../common/decorators/public.decorator';
@@ -41,8 +47,13 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Logout and revoke refresh token' })
+  @ApiOperation({
+    summary: 'Logout and revoke refresh token',
+    description:
+      'Requires a Bearer access token in the Authorization header (use the Authorize button) plus the refresh token in the body.',
+  })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid Bearer token' })
   async logout(@CurrentUser('userId') userId: string, @Body() dto: RefreshTokenDto) {
     return this.authService.logout(userId, dto);
   }

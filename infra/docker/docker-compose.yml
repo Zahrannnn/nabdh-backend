@@ -51,10 +51,8 @@ services:
       start_period: 15s
 
   api:
-    build:
-      context: ../../
-      dockerfile: infra/docker/Dockerfile
-      target: production
+    image: zahranna/nabdh-backend:dev
+    pull_policy: always
     container_name: nabdh-api
     restart: unless-stopped
     networks:
@@ -62,7 +60,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - ../../.env
+      - .env
     environment:
       MONGODB_URI: mongodb://nabdh:nabdh_dev@mongo:27017/nabdh?authSource=admin
     depends_on:
