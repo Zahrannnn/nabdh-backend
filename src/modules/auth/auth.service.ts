@@ -150,6 +150,9 @@ export class AuthService {
         throw new ServiceUnavailableException('خدمة قاعدة البيانات غير متاحة حالياً');
       }
       const e = err as { name?: string; code?: number | string };
+      if (e?.code === 11000) {
+        throw new ConflictException('هذا البريد مسجل مسبقاً');
+      }
       if (
         e?.name === 'MongooseServerSelectionError' ||
         e?.name === 'MongoServerSelectionError' ||
@@ -159,6 +162,10 @@ export class AuthService {
       ) {
         throw new ServiceUnavailableException('خدمة قاعدة البيانات غير متاحة حالياً');
       }
+      this.logger.error(
+        `Unexpected error in verifyOtp: ${(err as Error)?.message}`,
+        (err as Error)?.stack,
+      );
       throw new InternalServerErrorException('حدث خطأ غير متوقع');
     }
   }
