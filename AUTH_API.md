@@ -4,7 +4,7 @@
 
 **Content-Type**: `application/json`
 
-**Phone format**: Egyptian E.164 — `+201` + 9 digits (e.g. +201012345678)
+**Email format**: valid email address (e.g. user@example.com)
 
 **Response language**: Arabic for user-facing messages, English for error codes.
 
@@ -19,7 +19,7 @@ POST /auth/otp/send
 ### Request
 ```json
 {
-  "phone": "+201012345678",
+  "email": "user@example.com",
   "role": "PATIENT"
 }
 ```
@@ -36,8 +36,8 @@ POST /auth/otp/send
 ### Errors
 | Code | Meaning |
 |------|---------|
-| 429  | Phone rate limit (3 OTP / 15 min per phone) |
-| 409  | Phone registered with different role |
+| 429  | Email rate limit (3 OTP / 15 min per email) |
+| 409  | Email registered with different role |
 
 ---
 
@@ -50,7 +50,7 @@ POST /auth/otp/verify
 ### Request
 ```json
 {
-  "phone": "+201012345678",
+  "email": "user@example.com",
   "code": "123456",
   "role": "PATIENT"
 }
@@ -63,18 +63,21 @@ POST /auth/otp/verify
 {
   "accessToken": "eyJhbG...",
   "refreshToken": "a0b1c2d3e4f5...",
+  "isNewUser": true,
   "user": {
     "id": "667a1b2c3d4e5f6a7b8c9d0e",
-    "phone": "+201012345678",
+    "email": "user@example.com",
     "type": "PATIENT",
     "nurseStatus": null
   }
 }
 ```
 
+`isNewUser`: `true` if account was just created (first sign-up), `false` for returning users.
+
 `nurseStatus`: `null` for patients. For nurses: `"INCOMPLETE"`, `"PENDING"`, `"APPROVED"`, `"REJECTED"`.
 
-For **new users**: account is auto-created on verify.
+For **new users**: account and profile stub are auto-created on verify. Patient gets a Patient profile; Nurse gets a Nurse profile with `licenseNumber = PENDING-<userId>` and `verificationStatus = INCOMPLETE`. The nurse/patient completes their profile via the users endpoints.
 
 ### Errors
 | Code | Meaning |

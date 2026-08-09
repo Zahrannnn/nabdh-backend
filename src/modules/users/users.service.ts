@@ -2,7 +2,6 @@ import {
   Injectable,
   Logger,
   ForbiddenException,
-  ConflictException,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -48,28 +47,24 @@ export class UsersService {
     return this.userModel.findById(id).lean() as Promise<UserDocument | null>;
   }
 
-  async findByPhone(phone: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ phone }).lean() as Promise<UserDocument | null>;
+  async findByEmail(email: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ email }).lean() as Promise<UserDocument | null>;
   }
 
   async createPatientProfile(currentUser: any, dto: CreatePatientDto) {
     if (currentUser.type !== UserType.PATIENT) {
       throw new ForbiddenException('Only patients can create a patient profile');
     }
-    const existingPatient = await this.patientModel.findOne({
-      userId: currentUser.userId,
-    });
-
-    if (existingPatient) {
-      throw new ConflictException('Patient profile already exists');
-    }
-    const patient = await this.patientModel.create({
-      userId: currentUser.userId,
-      fullName: dto.fullName,
-      gender: dto.gender,
-      dateOfBirth: dto.dateOfBirth,
-      photoUrl: dto.photoUrl,
-    });
+    const patient = await this.patientModel.findOneAndUpdate(
+      { userId: currentUser.userId },
+      {
+        fullName: dto.fullName,
+        gender: dto.gender,
+        dateOfBirth: dto.dateOfBirth,
+        photoUrl: dto.photoUrl,
+      },
+      { upsert: true, new: true, omitUndefined: true },
+    );
     return patient;
   }
 
@@ -182,26 +177,21 @@ export class UsersService {
       throw new ForbiddenException('Only nurses can create a nurse profile');
     }
 
-    const existingNurse = await this.nurseModel.findOne({
-      userId: currentUser.userId,
-    });
-
-    if (existingNurse) {
-      throw new ConflictException('Nurse profile already exists');
-    }
-
-    const nurse = await this.nurseModel.create({
-      userId: currentUser.userId,
-      fullName: dto.fullName,
-      gender: dto.gender,
-      dateOfBirth: dto.dateOfBirth,
-      licenseNumber: dto.licenseNumber,
-      licenseExpiryDate: dto.licenseExpiryDate,
-      yearsOfExperience: dto.yearsOfExperience,
-      bio: dto.bio,
-      hourlyRate: dto.hourlyRate,
-      verificationStatus: VerificationStatus.INCOMPLETE,
-    });
+    const nurse = await this.nurseModel.findOneAndUpdate(
+      { userId: currentUser.userId },
+      {
+        fullName: dto.fullName,
+        gender: dto.gender,
+        dateOfBirth: dto.dateOfBirth,
+        licenseNumber: dto.licenseNumber,
+        licenseExpiryDate: dto.licenseExpiryDate,
+        yearsOfExperience: dto.yearsOfExperience,
+        bio: dto.bio,
+        hourlyRate: dto.hourlyRate,
+        verificationStatus: VerificationStatus.INCOMPLETE,
+      },
+      { upsert: true, new: true, omitUndefined: true },
+    );
 
     return nurse;
   }
@@ -340,7 +330,7 @@ export class UsersService {
       if (nurse.verificationStatus !== VerificationStatus.APPROVED) {
         throw new BadRequestException('Your account must be approved before going online');
       }
-      if (nurse.licenseExpiryDate <= new Date()) {
+      if (nurse.licenseExpiryDate && nurse.licenseExpiryDate <= new Date()) {
         throw new BadRequestException('Your nursing license has expired');
       }
       const minBalance = Number(process.env.NURSE_MIN_PREPAID_BALANCE ?? 100);

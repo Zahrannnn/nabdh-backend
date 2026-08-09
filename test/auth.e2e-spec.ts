@@ -1,3 +1,19 @@
+jest.mock('otplib', () => ({
+  OTP: jest.fn().mockImplementation(() => ({
+    verify: jest.fn().mockResolvedValue({ valid: true }),
+    generateSecret: jest.fn().mockReturnValue('mock_base32_secret'),
+    generateURI: jest
+      .fn()
+      .mockReturnValue('otpauth://totp/Nabdh:admin@test.com?secret=mock_base32_secret'),
+  })),
+  NobleCryptoPlugin: jest.fn().mockImplementation(() => ({})),
+  ScureBase32Plugin: jest.fn().mockImplementation(() => ({})),
+}));
+
+jest.mock('qrcode', () => ({
+  toDataURL: jest.fn().mockResolvedValue('data:image/png;base64,mock_qr_data'),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { MongoMemoryServer } from 'mongodb-memory-server';
@@ -11,6 +27,7 @@ import request from 'supertest';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { UsersModule } from '../src/modules/users/users.module';
 import { EmailProvider } from '../src/modules/auth/providers/email.provider';
+import { UploadService } from '../src/modules/upload/upload.service';
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 import { AllExceptionsFilter } from '../src/common/filters/http-exception.filter';
@@ -72,6 +89,11 @@ describe('Auth E2E', () => {
     })
       .overrideProvider(EmailProvider)
       .useValue(emailProvider)
+      .overrideProvider(UploadService)
+      .useValue({
+        upload: () => ({ url: '', key: '', mimeType: '', size: 0 }),
+        delete: () => undefined,
+      })
       .compile();
 
     app = moduleRef.createNestApplication();

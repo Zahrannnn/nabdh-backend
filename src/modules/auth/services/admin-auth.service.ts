@@ -136,7 +136,7 @@ export class AdminAuthService {
 
       const accessToken = this.tokenService.generateAccessToken({
         _id: String(user._id),
-        phone: user.phone,
+        email: user.email,
         type: user.type,
       });
       const refreshToken = await this.tokenService.createRefreshToken(String(user._id));

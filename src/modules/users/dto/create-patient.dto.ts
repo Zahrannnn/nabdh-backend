@@ -14,10 +14,10 @@ export class CreatePatientDto {
   @IsEnum(Gender)
   gender?: Gender;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2002-04-26T00:00:00.000Z' })
   @IsOptional()
   @IsDateString()
-  dateOfBirth?: Date;
+  dateOfBirth?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

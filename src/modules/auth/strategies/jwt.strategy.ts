@@ -18,7 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; phone: string; type: string; nurseStatus?: string }) {
+  async validate(payload: { sub: string; email: string; type: string; nurseStatus?: string }) {
     const user = await this.usersService.findById(payload.sub);
 
     if (!user) {
@@ -31,7 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       userId: user._id.toString(),
-      phone: user.phone,
+      email: user.email,
       type: user.type,
       status: user.status,
       nurseStatus: payload.nurseStatus,
