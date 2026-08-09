@@ -51,7 +51,7 @@ services:
       start_period: 15s
 
   api:
-    image: zahranna/nabdh-backend:dev
+    image: zahranna/nabdh-backend:develop
     pull_policy: always
     container_name: nabdh-api
     restart: unless-stopped
