@@ -16,7 +16,7 @@ import { User } from '../../users/schemas/user.schema';
 import { TempToken } from '../schemas/temp-token.schema';
 import { UserType, UserStatus } from '../../../common/enums';
 
-jest.mock('bcrypt', () => ({
+jest.mock('bcryptjs', () => ({
   hash: jest.fn(),
   compare: jest.fn().mockResolvedValue(true),
 }));
@@ -101,7 +101,6 @@ describe('AdminAuthService', () => {
       const mockUser = {
         _id: adminId,
         email: adminEmail,
-        phone: '+201234567890',
         type: UserType.ADMIN,
         status: UserStatus.ACTIVE,
         passwordHash: 'hashed_password',
@@ -116,7 +115,6 @@ describe('AdminAuthService', () => {
       const mockUser = {
         _id: adminId,
         email: adminEmail,
-        phone: '+201234567890',
         type: UserType.ADMIN,
         status: UserStatus.ACTIVE,
         passwordHash: 'hashed_password',
@@ -180,7 +178,6 @@ describe('AdminAuthService', () => {
       const mockUser = {
         _id: adminId,
         email: adminEmail,
-        phone: '+201234567890',
         type: UserType.ADMIN,
         totpSecret: 'existing_secret',
       };

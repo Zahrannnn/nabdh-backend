@@ -13,7 +13,7 @@ import { RefreshToken, RefreshTokenDocument } from '../schemas/refresh-token.sch
 
 interface TokenUser {
   _id: any;
-  phone: string;
+  email: string;
   type: string;
   nurseStatus?: string;
 }
@@ -35,7 +35,7 @@ export class TokenService {
       return this.jwtService.sign(
         {
           sub: user._id.toString(),
-          phone: user.phone,
+          email: user.email,
           type: user.type,
           nurseStatus: user.nurseStatus,
         },

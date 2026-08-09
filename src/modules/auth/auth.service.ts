@@ -4,7 +4,6 @@ import {
   UnauthorizedException,
   BadRequestException,
   ServiceUnavailableException,
-  NotFoundException,
   InternalServerErrorException,
   HttpException,
   ForbiddenException,
@@ -13,6 +12,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Error as MongooseError, Model } from 'mongoose';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { Patient, PatientDocument } from '../users/schemas/patient.schema';
 import { Nurse, NurseDocument } from '../users/schemas/nurse.schema';
 import { OtpSession, OtpSessionDocument } from './schemas/otp-session.schema';
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
@@ -31,6 +31,7 @@ export class AuthService {
     @InjectModel(OtpSession.name) private readonly otpSessionModel: Model<OtpSessionDocument>,
     @InjectModel(RefreshToken.name) private readonly refreshTokenModel: Model<RefreshTokenDocument>,
     @InjectModel(Nurse.name) private readonly nurseModel: Model<NurseDocument>,
+    @InjectModel(Patient.name) private readonly patientModel: Model<PatientDocument>,
     private readonly otpService: OtpService,
     private readonly tokenService: TokenService,
     private readonly emailProvider: EmailProvider,
@@ -120,12 +121,27 @@ export class AuthService {
         });
         isNewUser = true;
 
+        if (dto.role === UserType.PATIENT) {
+          await this.patientModel.create({
+            userId: user._id,
+            fullName: dto.email.split('@')[0],
+          });
+        } else if (dto.role === UserType.NURSE) {
+          await this.nurseModel.create({
+            userId: user._id,
+            fullName: dto.email.split('@')[0],
+            licenseNumber: `PENDING-${user._id}`,
+            verificationStatus: VerificationStatus.INCOMPLETE,
+          });
+          nurseStatus = VerificationStatus.INCOMPLETE;
+        }
+
         this.logger.log(`AUDIT: USER_REGISTERED userId=${user._id} type=${user.type}`);
       }
 
       const accessToken = this.tokenService.generateAccessToken({
         _id: user._id.toString(),
-        phone: user.phone,
+        email: user.email,
         type: user.type,
         nurseStatus,
       });
@@ -187,7 +203,7 @@ export class AuthService {
 
       const accessToken = this.tokenService.generateAccessToken({
         _id: user._id.toString(),
-        phone: user.phone,
+        email: user.email,
         type: user.type,
       });
 

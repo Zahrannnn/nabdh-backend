@@ -47,13 +47,13 @@ describe('TokenService', () => {
 
   describe('generateAccessToken', () => {
     it('calls jwtService.sign with correct payload and returns token', () => {
-      const user = { _id: mockUserId, phone: '+201234567890', type: 'PATIENT' };
+      const user = { _id: mockUserId, email: 'user@test.com', type: 'PATIENT' };
 
       const result = service.generateAccessToken(user as any);
 
       expect(result).toBe('access_jwt_token');
       expect(mockJwtService.sign).toHaveBeenCalledWith(
-        { sub: mockUserId, phone: '+201234567890', type: 'PATIENT' },
+        { sub: mockUserId, email: 'user@test.com', type: 'PATIENT' },
         { expiresIn: '15m' },
       );
     });
@@ -61,7 +61,7 @@ describe('TokenService', () => {
     it('uses JWT_ACCESS_EXPIRY from config', () => {
       (mockConfigService.get as jest.Mock).mockReturnValueOnce('30m');
 
-      const user = { _id: mockUserId, phone: '+201234567890', type: 'NURSE' };
+      const user = { _id: mockUserId, email: 'user@test.com', type: 'NURSE' };
       service.generateAccessToken(user as any);
 
       expect(mockJwtService.sign).toHaveBeenCalledWith(expect.any(Object), { expiresIn: '30m' });

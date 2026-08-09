@@ -25,8 +25,8 @@ export class Nurse {
   @Prop({ required: true, unique: true })
   licenseNumber: string;
 
-  @Prop({ required: true })
-  licenseExpiryDate: Date;
+  @Prop()
+  licenseExpiryDate?: Date;
 
   @Prop({ default: 0 })
   yearsOfExperience: number;

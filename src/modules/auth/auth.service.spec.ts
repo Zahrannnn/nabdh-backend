@@ -143,7 +143,6 @@ describe('AuthService', () => {
       const mockUser = {
         _id: { toString: () => 'user_id_123' },
         email: testEmail,
-        phone: '+201234567890',
         type: UserType.PATIENT,
         status: UserStatus.ACTIVE,
       };
@@ -202,7 +201,6 @@ describe('AuthService', () => {
       const mockUser = {
         _id: 'user_id_123',
         email: testEmail,
-        phone: '+201234567890',
         type: UserType.PATIENT,
       };
       Object.assign(mockUser, { _id: { toString: () => 'user_id_123' } });
