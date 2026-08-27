@@ -13,6 +13,7 @@ import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nes
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { UploadService } from './upload.service';
+import { matchesMagicBytes } from './magic-bytes';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -56,6 +57,13 @@ export class UploadController {
   async upload(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: any) {
     if (!file) {
       throw new BadRequestException('No file provided');
+    }
+
+    // The multipart Content-Type is client-asserted — verify the actual bytes.
+    if (!matchesMagicBytes(file.buffer, file.mimetype)) {
+      throw new BadRequestException(
+        'File content does not match its declared type. Allowed: PDF, JPG, PNG',
+      );
     }
 
     return this.uploadService.upload(file, user.userId);

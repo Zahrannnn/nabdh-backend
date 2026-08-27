@@ -11,7 +11,10 @@ export class UpdateLocationDto {
   @Max(180)
   longitude: number;
 
+  /** GPS speed in km/h — non-negative, capped at a plausible physical max. */
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(300)
   speed?: number;
 }
