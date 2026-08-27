@@ -69,7 +69,7 @@ export class UploadController {
       throw new BadRequestException('key query param required');
     }
 
-    this.uploadService.assertOwnedKey(key, user.userId);
+    await this.uploadService.assertCanAccess(key, user.userId);
 
     const url = await this.uploadService.getSignedUrl(key);
 

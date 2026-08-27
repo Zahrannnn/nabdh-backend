@@ -1,18 +1,28 @@
-import { BadRequestException, ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   HeadBucketCommand,
   CreateBucketCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
-/** Owner-scoped key layout: uploads/<ownerUserId>/<uuid>-<safeName> */
-export const UPLOAD_KEY_PATTERN = /^uploads\/(?!\.+$)(?!\.)([^/]+)\/([^/]+)$/;
+/**
+ * Owner-scoped key layout: uploads/<ownerUserId>/<uuid>-<safeName>
+ * `(?!\\.)` rejects `.` / `..` traversal segments in the owner position.
+ */
+export const UPLOAD_KEY_PATTERN = /^uploads\/(?!\.)([^/]+)\/([^/]+)$/;
 
 @Injectable()
 export class UploadService implements OnModuleInit {
@@ -54,18 +64,43 @@ export class UploadService implements OnModuleInit {
   }
 
   /**
-   * Ensures `key` is syntactically valid AND belongs to `ownerUserId`.
-   * Throws BadRequest/Forbidden — call before any signed-URL or delete operation.
+   * Ensures `key` is syntactically valid AND accessible by `ownerUserId`.
+   *
+   * Keys in the current `uploads/<userId>/...` layout are only accessible to
+   * their owner. Legacy keys (pre-owner-scoping, arbitrary layout, may even
+   * lack the `uploads/` prefix) are accepted **only if the object actually
+   * exists in the bucket** — so random strings get 400, existing legacy
+   * objects keep working until migrated.
    */
-  assertOwnedKey(key: string, ownerUserId: string): void {
+  async assertCanAccess(key: string, ownerUserId: string): Promise<void> {
     const match = UPLOAD_KEY_PATTERN.exec(key ?? '');
 
     if (!match) {
+      // Not owner-scoped layout: allow only if it is an existing legacy object.
+      if (await this.objectExists(key)) {
+        return;
+      }
+
       throw new BadRequestException('Invalid key format. Expected: uploads/<userId>/<fileName>');
     }
 
     if (match[1] !== ownerUserId) {
       throw new ForbiddenException('You do not have access to this upload');
+    }
+  }
+
+  /** HeadObject probe — true only if the object exists in the bucket. */
+  async objectExists(key: string): Promise<boolean> {
+    if (!key) {
+      return false;
+    }
+
+    try {
+      await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+
+      return true;
+    } catch {
+      return false;
     }
   }
 
