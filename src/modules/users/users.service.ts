@@ -250,7 +250,7 @@ export class UsersService {
       throw new NotFoundException('Nurse profile not found');
     }
 
-    const uploaded = await this.uploadService.upload(file);
+    const uploaded = await this.uploadService.upload(file, currentUser.userId);
 
     const document = await this.nurseDocumentModel.create({
       nurseId: nurse._id,

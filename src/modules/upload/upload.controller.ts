@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Controller,
   Get,
   Post,
@@ -16,7 +17,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Upload')
-@ApiBearerAuth('access-token')
+@ApiBearerAuth()
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class UploadController {
@@ -57,21 +58,24 @@ export class UploadController {
       throw new BadRequestException('No file provided');
     }
 
-    return this.uploadService.upload(file);
+    return this.uploadService.upload(file, user.userId);
   }
 
   @Get('upload/signed-url')
-  @ApiOperation({ summary: 'Get signed download URL' })
-  async getSignedUrl(@Query('key') key: string) {
+  @ApiOperation({ summary: 'Get signed download URL for one of your own uploads' })
+  @ApiBearerAuth()
+  async getSignedUrl(@Query('key') key: string, @CurrentUser() user: any) {
     if (!key) {
       throw new BadRequestException('key query param required');
     }
+
+    this.uploadService.assertOwnedKey(key, user.userId);
 
     const url = await this.uploadService.getSignedUrl(key);
 
     return {
       url,
-      expiresIn: 900,
+      expiresIn: UploadService.SIGNED_URL_TTL_SECONDS,
     };
   }
 }
