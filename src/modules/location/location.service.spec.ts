@@ -4,7 +4,7 @@ import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { LocationService } from './location.service';
 import { LocationHistory } from './schemas/location-history.schema';
 import { Nurse } from '../users/schemas';
-import { UserType } from '@common/enums';
+import { UserType, GenderPreference, VerificationStatus } from '@common/enums';
 
 describe('LocationService', () => {
   let service: LocationService;
@@ -263,5 +263,123 @@ describe('LocationService', () => {
         timestamp: history[1].createdAt,
       },
     ]);
+  });
+
+  describe('findNearbyNurses — pipeline construction', () => {
+    it('should append gender filter to $geoNear query when genderPref is FEMALE', async () => {
+      nurseModel.aggregate.mockResolvedValue([]);
+
+      await service.findNearbyNurses({
+        lat: 30.0444,
+        lng: 31.2357,
+        radiusKm: 10,
+        genderPref: GenderPreference.FEMALE,
+      });
+
+      const pipeline = nurseModel.aggregate.mock.calls[0][0];
+      const geoNearQuery = pipeline[0].$geoNear.query;
+
+      expect(geoNearQuery).toEqual({
+        isOnline: true,
+        verificationStatus: VerificationStatus.APPROVED,
+        gender: GenderPreference.FEMALE,
+      });
+    });
+
+    it('should append gender filter when genderPref is MALE', async () => {
+      nurseModel.aggregate.mockResolvedValue([]);
+
+      await service.findNearbyNurses({
+        lat: 30.0444,
+        lng: 31.2357,
+        radiusKm: 10,
+        genderPref: GenderPreference.MALE,
+      });
+
+      const geoNearQuery = nurseModel.aggregate.mock.calls[0][0][0].$geoNear.query;
+
+      expect(geoNearQuery.gender).toBe(GenderPreference.MALE);
+    });
+
+    it('should NOT filter by gender when genderPref is NO_PREFERENCE', async () => {
+      nurseModel.aggregate.mockResolvedValue([]);
+
+      await service.findNearbyNurses({
+        lat: 30.0444,
+        lng: 31.2357,
+        radiusKm: 10,
+        genderPref: GenderPreference.NO_PREFERENCE,
+      });
+
+      const geoNearQuery = nurseModel.aggregate.mock.calls[0][0][0].$geoNear.query;
+
+      expect(geoNearQuery).not.toHaveProperty('gender');
+    });
+
+    it('should NOT filter by gender when genderPref is omitted', async () => {
+      nurseModel.aggregate.mockResolvedValue([]);
+
+      await service.findNearbyNurses({ lat: 30.0444, lng: 31.2357, radiusKm: 10 });
+
+      const geoNearQuery = nurseModel.aggregate.mock.calls[0][0][0].$geoNear.query;
+
+      expect(geoNearQuery).not.toHaveProperty('gender');
+    });
+
+    it('should convert radiusKm to meters and keep base visibility filters', async () => {
+      nurseModel.aggregate.mockResolvedValue([]);
+
+      await service.findNearbyNurses({ lat: 30.0444, lng: 31.2357, radiusKm: 15 });
+
+      const { $geoNear } = nurseModel.aggregate.mock.calls[0][0][0];
+
+      expect($geoNear.maxDistance).toBe(15_000);
+      expect($geoNear.spherical).toBe(true);
+      expect($geoNear.query).toEqual({
+        isOnline: true,
+        verificationStatus: VerificationStatus.APPROVED,
+      });
+      expect($geoNear.near.coordinates).toEqual([31.2357, 30.0444]); // lng before lat
+    });
+
+    it('should return an empty list when no nurses match', async () => {
+      nurseModel.aggregate.mockResolvedValue([]);
+
+      const result = await service.findNearbyNurses({
+        lat: 30.0444,
+        lng: 31.2357,
+        radiusKm: 5,
+      });
+
+      expect(result).toEqual([]);
+    });
+
+    it('should cap results at 50 via $limit stage', async () => {
+      nurseModel.aggregate.mockResolvedValue([]);
+
+      await service.findNearbyNurses({ lat: 30.0444, lng: 31.2357, radiusKm: 50 });
+
+      const pipeline = nurseModel.aggregate.mock.calls[0][0];
+      const limitStage = pipeline.find((stage: Record<string, unknown>) => '$limit' in stage);
+
+      expect(limitStage.$limit).toBe(50);
+    });
+  });
+
+  describe('getLocationHistory — speed passthrough', () => {
+    it('should pass speed through as undefined when history rows have none', async () => {
+      const history = [
+        { lat: 30.0444, lng: 31.2357, createdAt: new Date('2026-08-27T10:00:00Z') },
+        { lat: 30.05, lng: 31.24, speed: null, createdAt: new Date('2026-08-27T10:05:00Z') },
+      ];
+
+      locationHistoryModel.find.mockReturnValue(historyQuery);
+      historyQuery.lean.mockResolvedValue(history);
+
+      const result = await service.getLocationHistory('nurse-id', 'admin-id', UserType.ADMIN);
+
+      expect(result[0].speed).toBeUndefined();
+      expect(result[1].speed).toBeNull();
+    });
   });
 });
